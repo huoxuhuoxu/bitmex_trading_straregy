@@ -6,8 +6,6 @@ import (
 	"log"
 	"os"
 	"strings"
-
-	"github.com/huoxuhuoxu/GoEx/bitmex"
 )
 
 var (
@@ -22,7 +20,7 @@ var (
 
 func main() {
 	flag.Parse()
-	bitmex.EnterTestMode()
+	// bitmex.EnterTestMode()
 
 	mc, err = NewMainCtrl(*isDebug)
 	if err != nil {
