@@ -2,17 +2,18 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/huoxuhuoxu/GoEx/bitmex"
 )
 
-const (
+var (
 	API_KEY    = ""
 	SECRET_KEY = ""
-)
 
-var (
 	isDebug = flag.Bool("debug", false, "running model")
 
 	mc  *MainControl
@@ -28,6 +29,21 @@ func main() {
 		log.Fatal("new main ctrl failed", err)
 	}
 	defer mc.Output.Close()
+
+	fs, err := os.Open("./realnet/keys.txt")
+	if err != nil {
+		mc.Output.Fatal("open keys-file failed", err)
+	}
+	byteKeys, err := ioutil.ReadAll(fs)
+	if err != nil {
+		mc.Output.Fatal("read fs failed", err)
+	}
+
+	str := string(byteKeys)
+	rets := strings.Split(str, "\n")
+
+	API_KEY = rets[0]
+	SECRET_KEY = rets[1]
 
 	trader := NewTrader(API_KEY, SECRET_KEY, mc, *isDebug)
 	trader.Running()
