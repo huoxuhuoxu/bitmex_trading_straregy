@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/huoxuhuoxu/GoEx/bitmex"
 )
 
 var (
@@ -14,13 +16,19 @@ var (
 
 	isDebug = flag.Bool("debug", false, "running model")
 
+	isTest = flag.Bool("modeTest", false, "env, test or pro")
+
 	mc  *MainControl
 	err error
 )
 
 func main() {
 	flag.Parse()
-	// bitmex.EnterTestMode()
+	// env: test
+	if *isTest {
+		bitmex.EnterTestMode()
+	}
+	log.Println(*isTest, *isDebug)
 
 	mc, err = NewMainCtrl(*isDebug)
 	if err != nil {
