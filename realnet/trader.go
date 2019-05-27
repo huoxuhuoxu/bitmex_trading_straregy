@@ -378,7 +378,7 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		}
 		reasonablePrice = t / t2
 		self.Output.Warn(middlePrice, reasonablePrice)
-		reasonablePrice = math.Ceil(reasonablePrice + (middlePrice - reasonablePrice))
+		reasonablePrice = math.Ceil(middlePrice + (middlePrice - reasonablePrice))
 		self.Output.Info("合理价格", reasonablePrice)
 	} else {
 		reasonablePrice = math.Floor(middlePrice + 0.5)
