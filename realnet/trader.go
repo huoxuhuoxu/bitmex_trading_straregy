@@ -27,6 +27,7 @@ type Trader struct {
 	Contract          *bitmex.Bitmex          // 交易所合约 API 对象
 	Currency          [2]string               // 交易对
 	BaseAmount        float64                 // 下单基础量
+	isRunning         bool                    // 发生意外
 	*PositionInfo                             // 账号运行时
 	chanOrders        chan *ActionOrder       // 订单处理管道
 	poOrders          map[string]*ActionOrder // 下成功的订单
@@ -50,6 +51,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
 		BaseAmount:      50,
+		isRunning:       true,
 		PositionInfo:    &PositionInfo{},
 		chanOrders:      make(chan *ActionOrder, 1),
 		poOrders:        make(map[string]*ActionOrder, 0),
@@ -72,22 +74,23 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 func (self *Trader) Running() {
 	self.wsReceiveMessage()
 	go self.handerList()
-	go self.getWallet()
+	// go self.getWallet()
 	go self.getPosition()
 	go self.readyPlaceOrders()
 }
 
 // ws异常处理
-func (self *Trader) wsExceptHandler(wsConn *conn.WsConn, isRunning *bool, err error) {
+func (self *Trader) wsExceptHandler(wsConn *conn.WsConn, err error) {
 	self.Output.Error("ws 连接发生异常", err)
 	for {
 		err := wsConn.ReConnectByArtificial()
 		if err != nil {
+			self.Output.Warn("reconn failed", err)
 			time.Sleep(time.Second)
 			continue
 		}
 		self.ProcessLock.Lock()
-		*isRunning = true
+		self.isRunning = true
 		self.ProcessLock.Unlock()
 		break
 	}
@@ -112,7 +115,6 @@ func (self *Trader) wsReceiveMessage() {
 		self.Output.Fatal("ws error", err)
 	}
 
-	var isRunning bool = true
 	wsConn.ReceiveMessage(func(data interface{}) {
 		switch data.(type) {
 		case goex.DepthPair:
@@ -121,14 +123,14 @@ func (self *Trader) wsReceiveMessage() {
 
 			self.ProcessLock.Lock()
 			defer self.ProcessLock.Unlock()
-			if !isRunning {
+			if !self.isRunning {
 				self.Output.Warn("ws conn ReConnectByArtificial ...")
 				return
 			}
 			if err != nil {
 				self.Depth = &Depth{}
-				isRunning = false
-				self.wsExceptHandler(wsConn, &isRunning, err)
+				self.isRunning = false
+				go self.wsExceptHandler(wsConn, err)
 				return
 			}
 
@@ -158,7 +160,7 @@ func (self *Trader) wsReceiveMessage() {
 			// tmpOrderbook.Bids = bids
 		}
 	}, func(err error) {
-		self.wsExceptHandler(wsConn, &isRunning, err)
+		self.wsExceptHandler(wsConn, err)
 	})
 }
 
@@ -293,6 +295,9 @@ func (self *Trader) readyPlaceOrders() {
 					}
 					count++
 				}
+			}
+			if !self.isRunning {
+				return false
 			}
 			if self.Depth.Sell == 0 || self.Depth.Buy == 0 {
 				return false
