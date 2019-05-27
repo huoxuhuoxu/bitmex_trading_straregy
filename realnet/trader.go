@@ -15,6 +15,7 @@ type Trader struct {
 	*MainControl                              // 主控
 	ApiKey, SecretKey string                  // key
 	Depth             *Depth                  // bitmex depth
+	OrderBook         *OrderBook              // bitmex orderbook
 	ProcessLock       *sync.RWMutex           // 执行流程锁
 	AlertPos          float64                 // 持仓禁戒线(调整挂单比例)
 	MaxPos            float64                 // 最大持仓
@@ -37,6 +38,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		ApiKey:          apiKey,
 		SecretKey:       secretKey,
 		Depth:           &Depth{},
+		OrderBook:       &OrderBook{},
 		ProcessLock:     &sync.RWMutex{},
 		AlertPos:        1000,
 		MaxPos:          5000,
@@ -98,15 +100,41 @@ func (self *Trader) wsReceiveMessage() {
 		switch data.(type) {
 		case goex.DepthPair:
 			depthPair := data.(goex.DepthPair)
+			dc, err := wsConn.CompleteDepth(depthPair.Symbol)
+
 			self.ProcessLock.Lock()
-			if depthPair.Buy == self.Depth.Buy && depthPair.Sell == self.Depth.Sell {
-				self.ProcessLock.Unlock()
-				return
+			defer self.ProcessLock.Unlock()
+			if err != nil {
+				self.Output.Error("complete depth failed", err)
+				if depthPair.Buy == self.Depth.Buy && depthPair.Sell == self.Depth.Sell {
+					return
+				}
 			}
-			self.Depth.Buy = depthPair.Buy
-			self.Depth.Sell = depthPair.Sell
-			self.Output.Logf("real depth %+v", self.Depth)
-			self.ProcessLock.Unlock()
+
+			// depth
+			if depthPair.Buy != self.Depth.Buy || depthPair.Sell != self.Depth.Sell {
+				self.Depth.Buy = depthPair.Buy
+				self.Depth.Sell = depthPair.Sell
+				self.Output.Logf("real depth %+v", self.Depth)
+			}
+
+			// orderbook - 10 gp
+			tmpOrderbook := self.OrderBook
+			var asks, bids []GearPosition
+			for i, ask := range dc.AskList {
+				if i >= 10 {
+					break
+				}
+				asks = append(asks, GearPosition{ask.Price, ask.Amount})
+			}
+			tmpOrderbook.Asks = asks
+			for i, bid := range dc.BidList {
+				if i >= 10 {
+					break
+				}
+				bids = append(bids, GearPosition{bid.Price, bid.Amount})
+			}
+			tmpOrderbook.Bids = bids
 		}
 	}, func(err error) {
 		self.Output.Error("ws 连接发生异常", err)
@@ -320,12 +348,30 @@ func (self *Trader) getWallet() {
 // 策略 - 计算根据持仓计算合理价格
 func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderParams) {
 	var (
-		bidPrice, askPrice, bidAmount, askAmount, middlePrice float64
+		bidPrice, askPrice, bidAmount, askAmount float64
 	)
 	self.ProcessLock.RLock()
-	middlePrice = math.Floor((self.Depth.Buy+self.Depth.Sell)/2 + 0.5)
-	bidPrice = middlePrice - self.MinDiffPrice
-	askPrice = middlePrice + self.MinDiffPrice
+
+	var reasonablePrice float64
+	if len(self.OrderBook.Asks) >= 10 && len(self.OrderBook.Bids) >= 10 {
+		var t, t2 float64
+		for _, ask := range self.OrderBook.Asks {
+			t += ask.Amount * ask.Price
+			t2 += ask.Amount
+		}
+		for _, bid := range self.OrderBook.Bids {
+			t += bid.Amount * bid.Price
+			t2 += bid.Amount
+		}
+		reasonablePrice = math.Ceil(t / t2)
+		self.Output.Info("合理价格", reasonablePrice)
+	} else {
+		reasonablePrice = math.Floor((self.Depth.Buy+self.Depth.Sell)/2 + 0.5)
+		self.Output.Info("中间价", reasonablePrice)
+	}
+
+	bidPrice = reasonablePrice - self.MinDiffPrice
+	askPrice = reasonablePrice + self.MinDiffPrice
 	if self.PositionInfo != nil {
 		var diffPrice float64
 		qty := math.Abs(self.PositionInfo.AvgEntryQty)
@@ -342,9 +388,9 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 
 		if diffPrice != 0 {
 			if self.PositionInfo.AvgEntryQty > 0 {
-				bidPrice = math.Floor(middlePrice - diffPrice)
+				bidPrice = math.Floor(reasonablePrice - diffPrice)
 			} else {
-				askPrice = math.Ceil(middlePrice + diffPrice)
+				askPrice = math.Ceil(reasonablePrice + diffPrice)
 			}
 		}
 	}
