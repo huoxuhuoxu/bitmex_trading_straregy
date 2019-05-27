@@ -336,7 +336,7 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 			diffQty := qty - self.AlertPos
 			// 超过警戒线了
 			if diffQty > 0 {
-				diffPrice = self.AlertPos / self.MaxPos * self.MaxDiffPrice
+				diffPrice = qty / self.MaxPos * self.MaxDiffPrice
 			}
 		}
 
