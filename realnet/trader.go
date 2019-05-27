@@ -44,8 +44,8 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		MaxPos:          5000,
 		MinDiffPrice:    3.5,
 		MaxDiffPrice:    18,
-		TimeStep:        time.Second * 30,
-		CancelOrderStep: time.Second * 300,
+		TimeStep:        time.Second * 45,
+		CancelOrderStep: time.Second * 225,
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
@@ -77,6 +77,22 @@ func (self *Trader) Running() {
 	go self.readyPlaceOrders()
 }
 
+// ws异常处理
+func (self *Trader) wsExceptHandler(wsConn *conn.WsConn, isRunning *bool, err error) {
+	self.Output.Error("ws 连接发生异常", err)
+	for {
+		err := wsConn.ReConnectByArtificial()
+		if err != nil {
+			time.Sleep(time.Second)
+			continue
+		}
+		self.ProcessLock.Lock()
+		*isRunning = true
+		self.ProcessLock.Unlock()
+		break
+	}
+}
+
 // 接收ws推送的orderbook
 func (self *Trader) wsReceiveMessage() {
 	wsConn, err := conn.NewWsConn(
@@ -96,6 +112,7 @@ func (self *Trader) wsReceiveMessage() {
 		self.Output.Fatal("ws error", err)
 	}
 
+	var isRunning bool = true
 	wsConn.ReceiveMessage(func(data interface{}) {
 		switch data.(type) {
 		case goex.DepthPair:
@@ -104,11 +121,15 @@ func (self *Trader) wsReceiveMessage() {
 
 			self.ProcessLock.Lock()
 			defer self.ProcessLock.Unlock()
+			if !isRunning {
+				self.Output.Warn("ws conn ReConnectByArtificial ...")
+				return
+			}
 			if err != nil {
-				self.Output.Error("complete depth failed", err)
-				if depthPair.Buy == self.Depth.Buy && depthPair.Sell == self.Depth.Sell {
-					return
-				}
+				self.Depth = &Depth{}
+				isRunning = false
+				self.wsExceptHandler(wsConn, &isRunning, err)
+				return
 			}
 
 			// depth
@@ -137,15 +158,7 @@ func (self *Trader) wsReceiveMessage() {
 			tmpOrderbook.Bids = bids
 		}
 	}, func(err error) {
-		self.Output.Error("ws 连接发生异常", err)
-		for {
-			err := wsConn.ReConnectByArtificial()
-			if err != nil {
-				time.Sleep(time.Second)
-				continue
-			}
-			break
-		}
+		self.wsExceptHandler(wsConn, &isRunning, err)
 	})
 }
 
