@@ -299,7 +299,7 @@ func (self *Trader) readyPlaceOrders() {
 			if !self.isRunning {
 				return false
 			}
-			if self.Depth.Sell == 0 || self.Depth.Buy == 0 {
+			if self.Depth == nil || self.Depth.Sell == 0 || self.Depth.Buy == 0 {
 				return false
 			}
 			return true
