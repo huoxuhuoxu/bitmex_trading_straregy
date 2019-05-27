@@ -70,6 +70,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 func (self *Trader) Running() {
 	self.wsReceiveMessage()
 	go self.handerList()
+	go self.getWallet()
 	go self.getPosition()
 	go self.readyPlaceOrders()
 }
@@ -202,6 +203,17 @@ func (self *Trader) handerList() {
 					}
 					self.Output.Logf("pos info %+v", self.PositionInfo)
 					self.ProcessLock.Unlock()
+
+				case ACTION_WALLET:
+					wallet, err := self.Exchange.AccountInfo()
+					if err != nil {
+						self.Output.Warn("get wallet failed", err)
+						continue
+					}
+
+					for pairName, subAccount := range wallet.SubAccounts {
+						self.Output.Info(pairName, subAccount.Amount/100000000)
+					}
 				}
 			}
 		}
@@ -275,13 +287,31 @@ func (self *Trader) getPosition() {
 	for {
 		select {
 		case <-self.Ctx.Done():
-			self.Output.Log("chan action order, closed")
+			self.Output.Log("chan get pos, closed")
 			return
 		default:
 			posAction := &ActionOrder{
 				Action: ACTION_POS,
 			}
 			self.chanOrders <- posAction
+		}
+		<-chanTick
+	}
+}
+
+// 获取账户信息
+func (self *Trader) getWallet() {
+	chanTick := time.Tick(time.Minute)
+	for {
+		select {
+		case <-self.Ctx.Done():
+			self.Output.Log("chan get wallet, closed")
+			return
+		default:
+			wallet := &ActionOrder{
+				Action: ACTION_WALLET,
+			}
+			self.chanOrders <- wallet
 		}
 		<-chanTick
 	}
