@@ -38,12 +38,12 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		SecretKey:       secretKey,
 		Depth:           &Depth{},
 		ProcessLock:     &sync.RWMutex{},
-		AlertPos:        2000,
+		AlertPos:        1000,
 		MaxPos:          5000,
 		MinDiffPrice:    3.5,
 		MaxDiffPrice:    15,
-		TimeStep:        time.Minute * 1,
-		CancelOrderStep: time.Minute * 10,
+		TimeStep:        time.Second * 30,
+		CancelOrderStep: time.Second * 150,
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
@@ -271,7 +271,7 @@ func (self *Trader) readyPlaceOrders() {
 
 // 获取当前持仓情况
 func (self *Trader) getPosition() {
-	chanTick := time.Tick(time.Minute)
+	chanTick := time.Tick(self.TimeStep)
 	for {
 		select {
 		case <-self.Ctx.Done():
