@@ -212,7 +212,7 @@ func (self *Trader) handerList() {
 					}
 
 					for pairName, subAccount := range wallet.SubAccounts {
-						self.Output.Info(pairName, subAccount.Amount/100000000)
+						self.Output.Info("参考:", pairName, subAccount.Amount/100000000)
 					}
 				}
 			}
