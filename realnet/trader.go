@@ -361,11 +361,9 @@ func (self *Trader) getWallet() {
 // 策略 - 计算根据持仓计算合理价格
 func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderParams) {
 	var (
-		bidPrice, askPrice, bidAmount, askAmount, middlePrice, reasonablePrice float64
+		bidPrice, askPrice, bidAmount, askAmount, reasonablePrice float64
 	)
 	self.ProcessLock.RLock()
-	middlePrice = (self.Depth.Buy + self.Depth.Sell) / 2
-
 	if len(self.OrderBook.Asks) >= 10 && len(self.OrderBook.Bids) >= 10 {
 		var t, t2 float64
 		for _, ask := range self.OrderBook.Asks {
@@ -377,11 +375,9 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 			t2 += bid.Amount
 		}
 		reasonablePrice = t / t2
-		self.Output.Warn(middlePrice, reasonablePrice)
-		reasonablePrice = math.Ceil(middlePrice + (middlePrice - reasonablePrice))
 		self.Output.Info("合理价格", reasonablePrice)
 	} else {
-		reasonablePrice = math.Floor(middlePrice + 0.5)
+		reasonablePrice = math.Floor((self.Depth.Buy+self.Depth.Sell)/2 + 0.5)
 		self.Output.Info("中间价", reasonablePrice)
 	}
 
