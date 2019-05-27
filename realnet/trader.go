@@ -41,7 +41,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		AlertPos:        1000,
 		MaxPos:          5000,
 		MinDiffPrice:    3.5,
-		MaxDiffPrice:    15,
+		MaxDiffPrice:    18,
 		TimeStep:        time.Second * 30,
 		CancelOrderStep: time.Second * 150,
 		Exchange:        nil,
