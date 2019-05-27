@@ -117,7 +117,7 @@ func (self *Trader) wsReceiveMessage() {
 		switch data.(type) {
 		case goex.DepthPair:
 			depthPair := data.(goex.DepthPair)
-			dc, err := wsConn.CompleteDepth(depthPair.Symbol)
+			// dc, err := wsConn.CompleteDepth(depthPair.Symbol)
 
 			self.ProcessLock.Lock()
 			defer self.ProcessLock.Unlock()
