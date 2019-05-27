@@ -342,9 +342,9 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 
 		if diffPrice != 0 {
 			if self.PositionInfo.AvgEntryQty > 0 {
-				bidPrice = math.Ceil(middlePrice - diffPrice)
+				bidPrice = math.Floor(middlePrice - diffPrice)
 			} else {
-				askPrice = math.Floor(middlePrice + diffPrice)
+				askPrice = math.Ceil(middlePrice + diffPrice)
 			}
 		}
 	}
