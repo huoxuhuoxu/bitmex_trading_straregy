@@ -44,8 +44,8 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		MaxPos:          5000,
 		MinDiffPrice:    3.5,
 		MaxDiffPrice:    18,
-		TimeStep:        time.Second * 30,
-		CancelOrderStep: time.Second * 150,
+		TimeStep:        time.Second * 60,
+		CancelOrderStep: time.Second * 300,
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
@@ -140,22 +140,22 @@ func (self *Trader) wsReceiveMessage() {
 			}
 
 			// orderbook - 10 gp
-			tmpOrderbook := self.OrderBook
-			var asks, bids []GearPosition
-			for i, ask := range dc.AskList {
-				if i >= 10 {
-					break
-				}
-				asks = append(asks, GearPosition{ask.Price, ask.Amount})
-			}
-			tmpOrderbook.Asks = asks
-			for i, bid := range dc.BidList {
-				if i >= 10 {
-					break
-				}
-				bids = append(bids, GearPosition{bid.Price, bid.Amount})
-			}
-			tmpOrderbook.Bids = bids
+			// tmpOrderbook := self.OrderBook
+			// var asks, bids []GearPosition
+			// for i, ask := range dc.AskList {
+			// 	if i >= 10 {
+			// 		break
+			// 	}
+			// 	asks = append(asks, GearPosition{ask.Price, ask.Amount})
+			// }
+			// tmpOrderbook.Asks = asks
+			// for i, bid := range dc.BidList {
+			// 	if i >= 10 {
+			// 		break
+			// 	}
+			// 	bids = append(bids, GearPosition{bid.Price, bid.Amount})
+			// }
+			// tmpOrderbook.Bids = bids
 		}
 	}, func(err error) {
 		self.wsExceptHandler(wsConn, &isRunning, err)
