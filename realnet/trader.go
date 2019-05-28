@@ -449,7 +449,7 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		askRatio := askT / t
 
 		if bidRatio < 0.15 || askRatio < 0.15 {
-			self.Output.Warn("市场双方出现方向", bidRatio, askRatio)
+			self.Output.Warnf("极端行情, 不做, %.2f : %.2f", bidRatio, askRatio)
 			return nil, nil, errors.New("stop!")
 		}
 	}
