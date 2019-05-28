@@ -31,7 +31,7 @@ type Trader struct {
 	*PositionInfo                             // 账号运行时
 	chanOrders        chan *ActionOrder       // 订单处理管道
 	poOrders          map[string]*ActionOrder // 下成功的订单
-	strategyIndex     int                     // 策略切换
+	// strategyIndex     int                     // 策略切换
 }
 
 func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader {
@@ -56,7 +56,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		PositionInfo:    &PositionInfo{},
 		chanOrders:      make(chan *ActionOrder, 1),
 		poOrders:        make(map[string]*ActionOrder, 0),
-		strategyIndex:   0,
+		// strategyIndex:   0,
 	}
 
 	self.Exchange = conn.NewConn(
@@ -122,7 +122,7 @@ func (self *Trader) wsReceiveMessage() {
 		switch data.(type) {
 		case goex.DepthPair:
 			depthPair := data.(goex.DepthPair)
-			dc, err := wsConn.CompleteDepth(depthPair.Symbol)
+			// dc, err := wsConn.CompleteDepth(depthPair.Symbol)
 
 			self.ProcessLock.Lock()
 			defer self.ProcessLock.Unlock()
@@ -145,22 +145,22 @@ func (self *Trader) wsReceiveMessage() {
 			}
 
 			// orderbook - 10 gp
-			tmpOrderbook := self.OrderBook
-			var asks, bids []GearPosition
-			for i, ask := range dc.AskList {
-				if i >= 10 {
-					break
-				}
-				asks = append(asks, GearPosition{ask.Price, ask.Amount})
-			}
-			tmpOrderbook.Asks = asks
-			for i, bid := range dc.BidList {
-				if i >= 10 {
-					break
-				}
-				bids = append(bids, GearPosition{bid.Price, bid.Amount})
-			}
-			tmpOrderbook.Bids = bids
+			// tmpOrderbook := self.OrderBook
+			// var asks, bids []GearPosition
+			// for i, ask := range dc.AskList {
+			// 	if i >= 10 {
+			// 		break
+			// 	}
+			// 	asks = append(asks, GearPosition{ask.Price, ask.Amount})
+			// }
+			// tmpOrderbook.Asks = asks
+			// for i, bid := range dc.BidList {
+			// 	if i >= 10 {
+			// 		break
+			// 	}
+			// 	bids = append(bids, GearPosition{bid.Price, bid.Amount})
+			// }
+			// tmpOrderbook.Bids = bids
 		}
 	}, func(err error) {
 		self.wsExceptHandler(wsConn, err)
@@ -426,35 +426,38 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		bidPrice, askPrice, bidAmount, askAmount, middlePrice, reasonablePrice float64
 	)
 
-	i := self.strategyIndex % 3
-	self.strategyIndex++
-	if self.strategyIndex >= 3 {
-		self.strategyIndex = 0
-	}
+	// i := self.strategyIndex % 3
+	// self.strategyIndex++
+	// if self.strategyIndex >= 3 {
+	// 	self.strategyIndex = 0
+	// }
 
 	self.ProcessLock.RLock()
 	middlePrice = (self.Depth.Buy + self.Depth.Sell) / 2
 
-	if len(self.OrderBook.Asks) >= 10 && len(self.OrderBook.Bids) >= 10 && i == 0 {
-		var bidT, bidT2, bidP, askT, askT2, askP float64
-		for _, ask := range self.OrderBook.Asks {
-			askT += ask.Amount * ask.Price
-			askT2 += ask.Amount
-		}
-		askP = askT / askT2
+	// if len(self.OrderBook.Asks) >= 10 && len(self.OrderBook.Bids) >= 10 && i == 0 {
+	// 	var bidT, bidT2, bidP, askT, askT2, askP float64
+	// 	for _, ask := range self.OrderBook.Asks {
+	// 		askT += ask.Amount * ask.Price
+	// 		askT2 += ask.Amount
+	// 	}
+	// 	askP = askT / askT2
 
-		for _, bid := range self.OrderBook.Bids {
-			bidT += bid.Amount * bid.Price
-			bidT2 += bid.Amount
-		}
-		bidP = bidT / bidT2
+	// 	for _, bid := range self.OrderBook.Bids {
+	// 		bidT += bid.Amount * bid.Price
+	// 		bidT2 += bid.Amount
+	// 	}
+	// 	bidP = bidT / bidT2
 
-		reasonablePrice = math.Floor((bidP + askP) / 2)
-		self.Output.Info("合理价格", reasonablePrice, bidP, askP)
-	} else {
-		reasonablePrice = math.Floor(middlePrice + 0.5)
-		self.Output.Info("中间价", reasonablePrice)
-	}
+	// 	reasonablePrice = math.Floor((bidP + askP) / 2)
+	// 	self.Output.Info("合理价格", reasonablePrice, bidP, askP)
+	// } else {
+	// 	reasonablePrice = math.Floor(middlePrice + 0.5)
+	// 	self.Output.Info("中间价", reasonablePrice)
+	// }
+
+	reasonablePrice = math.Floor(middlePrice + 0.5)
+	self.Output.Info("中间价", reasonablePrice)
 
 	bidPrice = reasonablePrice - self.MinDiffPrice
 	askPrice = reasonablePrice + self.MinDiffPrice
