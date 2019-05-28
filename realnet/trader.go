@@ -457,8 +457,8 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		}
 
 		maxAmount := self.BaseAmount * 2
-		bidAmount = maxAmount * bidRatio
-		askAmount = maxAmount * askRatio
+		bidAmount = math.Ceil(maxAmount * bidRatio)
+		askAmount = math.Ceil(maxAmount * askRatio)
 
 		if bidAmount > maxAmount || askAmount > maxAmount {
 			self.Output.Warn("下单量出现问题", bidAmount, bidRatio, askAmount, askRatio)
