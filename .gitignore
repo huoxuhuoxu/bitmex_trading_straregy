@@ -1,4 +1,4 @@
 .DS_Store
 logs/*.log
 test/*
-keys.*
+keys*.*

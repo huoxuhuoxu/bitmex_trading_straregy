@@ -45,8 +45,8 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		MaxPos:          5000,
 		MinDiffPrice:    3.5,
 		MaxDiffPrice:    18,
-		TimeStep:        time.Second * 60,
-		CancelOrderStep: time.Second * 300,
+		TimeStep:        time.Second * 45,
+		CancelOrderStep: time.Second * 225,
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
@@ -212,12 +212,11 @@ func (self *Trader) handerList() {
 					}
 
 				case ACTION_CO:
-					order, err := self.Exchange.CancelOrder(tmpOrder.ID)
+					_, err := self.Exchange.CancelOrder(tmpOrder.ID)
 					if err != nil {
 						self.Output.Warnf("cancel order %s failed, %s", tmpOrder.Side.String(), err)
 						continue
 					}
-					self.Output.Infof("cancel order %s succ, %+v", tmpOrder.Side.String(), order)
 
 				case ACTION_POS:
 					data, err := self.Contract.GetPosition(goex.NewCurrencyPair(goex.NewCurrency(self.Currency[0], ""), goex.NewCurrency(self.Currency[1], "")))
@@ -244,7 +243,7 @@ func (self *Trader) handerList() {
 						currentQty,
 						closingPrice,
 					}
-					self.Output.Logf("pos info %+v", self.PositionInfo)
+					self.Output.Infof("pos info %+v", self.PositionInfo)
 					self.ProcessLock.Unlock()
 
 				case ACTION_WALLET:
@@ -290,7 +289,7 @@ func (self *Trader) readyPlaceOrders() {
 					if n.Sub(poOrder.Time) > self.CancelOrderStep {
 						delete(self.poOrders, ID)
 						poOrder.Action = ACTION_CO
-						self.Output.Infof("ready cancel order %+v", poOrder)
+						// self.Output.Infof("ready cancel order %+v", poOrder)
 						self.chanOrders <- poOrder
 					}
 					count++
@@ -329,7 +328,7 @@ func (self *Trader) readyPlaceOrders() {
 
 // 获取当前持仓情况
 func (self *Trader) getPosition() {
-	chanTick := time.Tick(self.TimeStep)
+	chanTick := time.Tick(self.TimeStep * 2)
 	for {
 		select {
 		case <-self.Ctx.Done():
