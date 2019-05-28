@@ -430,9 +430,6 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		bidPrice, askPrice, bidAmount, askAmount, middlePrice, reasonablePrice float64
 	)
 
-	bidAmount = self.BaseAmount
-	askAmount = self.BaseAmount
-
 	self.ProcessLock.RLock()
 	defer self.ProcessLock.RUnlock()
 	middlePrice = (self.Depth.Buy + self.Depth.Sell) / 2
@@ -455,17 +452,6 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 			self.Output.Warn("市场双方出现方向", bidRatio, askRatio)
 			return nil, nil, errors.New("stop!")
 		}
-
-		maxAmount := self.BaseAmount * 2
-		bidAmount = math.Ceil(maxAmount * bidRatio)
-		askAmount = math.Ceil(maxAmount * askRatio)
-
-		if bidAmount > maxAmount || askAmount > maxAmount {
-			self.Output.Warn("下单量出现问题", bidAmount, bidRatio, askAmount, askRatio)
-			return nil, nil, errors.New("stop!")
-		}
-
-		self.Output.Infof("市场10档多空强弱 %.2f%% %.2f%%", bidRatio, askRatio)
 	}
 
 	reasonablePrice = math.Floor(middlePrice + 0.5)
@@ -495,6 +481,9 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 			}
 		}
 	}
+
+	bidAmount = self.BaseAmount
+	askAmount = self.BaseAmount
 
 	return &PlaceOrderParams{bidPrice, bidAmount}, &PlaceOrderParams{askPrice, askAmount}, nil
 }
