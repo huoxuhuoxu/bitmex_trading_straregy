@@ -448,16 +448,22 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		}
 
 		t := bidT + askT
-		bidRatio := bidT / t * 100
-		askRatio := askT / t * 100
+		bidRatio := bidT / t
+		askRatio := askT / t
 
-		if bidRatio < 15 || askRatio < 15 {
+		if bidRatio < 0.15 || askRatio < 0.15 {
 			self.Output.Warn("市场双方出现方向", bidRatio, askRatio)
 			return nil, nil, errors.New("stop!")
 		}
 
-		bidAmount = self.BaseAmount * 2 * bidRatio
-		askRatio = self.BaseAmount * 2 * askRatio
+		maxAmount := self.BaseAmount * 2
+		bidAmount = maxAmount * bidRatio
+		askAmount = maxAmount * askRatio
+
+		if bidAmount > maxAmount || askAmount > maxAmount {
+			self.Output.Warn("下单量出现问题", bidAmount, bidRatio, askAmount, askRatio)
+			return nil, nil, errors.New("stop!")
+		}
 
 		self.Output.Infof("市场10档多空强弱 %.2f%% %.2f%%", bidRatio, askRatio)
 	}
