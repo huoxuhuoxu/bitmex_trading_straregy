@@ -44,7 +44,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		ProcessLock:     &sync.RWMutex{},
 		AlertPos:        1000,
 		MaxPos:          5000,
-		MinDiffPrice:    3.5,
+		MinDiffPrice:    3,
 		MaxDiffPrice:    18,
 		TimeStep:        time.Second * 30,
 		CancelOrderStep: time.Second * 150,
@@ -426,9 +426,9 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		bidPrice, askPrice, bidAmount, askAmount, middlePrice, reasonablePrice float64
 	)
 
-	i := self.strategyIndex % 2
+	i := self.strategyIndex % 3
 	self.strategyIndex++
-	if self.strategyIndex >= 2 {
+	if self.strategyIndex >= 3 {
 		self.strategyIndex = 0
 	}
 
