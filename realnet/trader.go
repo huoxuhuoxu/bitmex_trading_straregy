@@ -44,7 +44,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		ProcessLock:     &sync.RWMutex{},
 		AlertPos:        1000,
 		MaxPos:          5000,
-		MinDiffPrice:    3,
+		MinDiffPrice:    3.5,
 		MaxDiffPrice:    18,
 		TimeStep:        time.Second * 45,
 		CancelOrderStep: time.Second * 225,
