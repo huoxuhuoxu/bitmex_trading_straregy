@@ -42,6 +42,7 @@ const (
 	ACTION_CO
 	ACTION_POS
 	ACTION_WALLET
+	ACTION_CLOSING
 )
 const (
 	TraderBuy TraderSide = iota + 1
@@ -50,7 +51,7 @@ const (
 
 // type to string
 var (
-	ActionName     = []string{"PLACE_ORDER", "CANCEL_ORDER", "GET_POS", "GET_WALLET"}
+	ActionName     = []string{"PLACE_ORDER", "CANCEL_ORDER", "GET_POS", "GET_WALLET", "CLOSING_POS"}
 	TraderSideName = []string{"BUY", "SELL"}
 )
 
