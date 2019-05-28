@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"math"
 	"net/http"
 	"sync"
@@ -31,7 +32,6 @@ type Trader struct {
 	*PositionInfo                             // 账号运行时
 	chanOrders        chan *ActionOrder       // 订单处理管道
 	poOrders          map[string]*ActionOrder // 下成功的订单
-	// strategyIndex     int                     // 策略切换
 }
 
 func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader {
@@ -46,8 +46,8 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		MaxPos:          5000,
 		MinDiffPrice:    3,
 		MaxDiffPrice:    18,
-		TimeStep:        time.Second * 30,
-		CancelOrderStep: time.Second * 150,
+		TimeStep:        time.Second * 45,
+		CancelOrderStep: time.Second * 225,
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
@@ -56,7 +56,6 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		PositionInfo:    &PositionInfo{},
 		chanOrders:      make(chan *ActionOrder, 1),
 		poOrders:        make(map[string]*ActionOrder, 0),
-		// strategyIndex:   0,
 	}
 
 	self.Exchange = conn.NewConn(
@@ -122,7 +121,7 @@ func (self *Trader) wsReceiveMessage() {
 		switch data.(type) {
 		case goex.DepthPair:
 			depthPair := data.(goex.DepthPair)
-			// dc, err := wsConn.CompleteDepth(depthPair.Symbol)
+			dc, err := wsConn.CompleteDepth(depthPair.Symbol)
 
 			self.ProcessLock.Lock()
 			defer self.ProcessLock.Unlock()
@@ -145,22 +144,22 @@ func (self *Trader) wsReceiveMessage() {
 			}
 
 			// orderbook - 10 gp
-			// tmpOrderbook := self.OrderBook
-			// var asks, bids []GearPosition
-			// for i, ask := range dc.AskList {
-			// 	if i >= 10 {
-			// 		break
-			// 	}
-			// 	asks = append(asks, GearPosition{ask.Price, ask.Amount})
-			// }
-			// tmpOrderbook.Asks = asks
-			// for i, bid := range dc.BidList {
-			// 	if i >= 10 {
-			// 		break
-			// 	}
-			// 	bids = append(bids, GearPosition{bid.Price, bid.Amount})
-			// }
-			// tmpOrderbook.Bids = bids
+			tmpOrderbook := self.OrderBook
+			var asks, bids []GearPosition
+			for i, ask := range dc.AskList {
+				if i >= 10 {
+					break
+				}
+				asks = append(asks, GearPosition{ask.Price, ask.Amount})
+			}
+			tmpOrderbook.Asks = asks
+			for i, bid := range dc.BidList {
+				if i >= 10 {
+					break
+				}
+				bids = append(bids, GearPosition{bid.Price, bid.Amount})
+			}
+			tmpOrderbook.Bids = bids
 		}
 	}, func(err error) {
 		self.wsExceptHandler(wsConn, err)
@@ -326,7 +325,12 @@ func (self *Trader) readyPlaceOrders() {
 			continue
 		}
 
-		bidParams, askParams := self.calculateReasonablePrice()
+		bidParams, askParams, err := self.calculateReasonablePrice()
+		if err != nil {
+			self.Output.Warn(err)
+			continue
+		}
+
 		buyOrder := &ActionOrder{
 			Action: ACTION_PO,
 			Amount: bidParams.Amount,
@@ -421,40 +425,42 @@ func (self *Trader) ClosingPos() {
 }
 
 // 策略 - 计算根据持仓计算合理价格
-func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderParams) {
+func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderParams, error) {
 	var (
 		bidPrice, askPrice, bidAmount, askAmount, middlePrice, reasonablePrice float64
 	)
 
-	// i := self.strategyIndex % 3
-	// self.strategyIndex++
-	// if self.strategyIndex >= 3 {
-	// 	self.strategyIndex = 0
-	// }
+	bidAmount = self.BaseAmount
+	askAmount = self.BaseAmount
 
 	self.ProcessLock.RLock()
+	defer self.ProcessLock.RUnlock()
 	middlePrice = (self.Depth.Buy + self.Depth.Sell) / 2
 
-	// if len(self.OrderBook.Asks) >= 10 && len(self.OrderBook.Bids) >= 10 && i == 0 {
-	// 	var bidT, bidT2, bidP, askT, askT2, askP float64
-	// 	for _, ask := range self.OrderBook.Asks {
-	// 		askT += ask.Amount * ask.Price
-	// 		askT2 += ask.Amount
-	// 	}
-	// 	askP = askT / askT2
+	if len(self.OrderBook.Asks) >= 10 && len(self.OrderBook.Bids) >= 10 {
+		var bidT, askT float64
+		for _, ask := range self.OrderBook.Asks {
+			askT += ask.Amount
+		}
 
-	// 	for _, bid := range self.OrderBook.Bids {
-	// 		bidT += bid.Amount * bid.Price
-	// 		bidT2 += bid.Amount
-	// 	}
-	// 	bidP = bidT / bidT2
+		for _, bid := range self.OrderBook.Bids {
+			bidT += bid.Amount
+		}
 
-	// 	reasonablePrice = math.Floor((bidP + askP) / 2)
-	// 	self.Output.Info("合理价格", reasonablePrice, bidP, askP)
-	// } else {
-	// 	reasonablePrice = math.Floor(middlePrice + 0.5)
-	// 	self.Output.Info("中间价", reasonablePrice)
-	// }
+		t := bidT + askT
+		bidRatio := bidT / t * 100
+		askRatio := askT / t * 100
+
+		if bidRatio < 15 || askRatio < 15 {
+			self.Output.Warn("市场双方出现方向", bidRatio, askRatio)
+			return nil, nil, errors.New("stop!")
+		}
+
+		bidAmount = self.BaseAmount * 2 * bidRatio
+		askRatio = self.BaseAmount * 2 * askRatio
+
+		self.Output.Infof("市场10档多空强弱 %.2f%% %.2f%%", bidRatio, askRatio)
+	}
 
 	reasonablePrice = math.Floor(middlePrice + 0.5)
 	self.Output.Info("中间价", reasonablePrice)
@@ -483,10 +489,6 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 			}
 		}
 	}
-	self.ProcessLock.RUnlock()
 
-	bidAmount = self.BaseAmount
-	askAmount = self.BaseAmount
-
-	return &PlaceOrderParams{bidPrice, bidAmount}, &PlaceOrderParams{askPrice, askAmount}
+	return &PlaceOrderParams{bidPrice, bidAmount}, &PlaceOrderParams{askPrice, askAmount}, nil
 }
