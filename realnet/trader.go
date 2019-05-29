@@ -403,7 +403,7 @@ func (self *Trader) ClosingPos() {
 			self.ProcessLock.RUnlock()
 
 			absAvgEntryQty := math.Abs(avgEntryQty)
-			if absAvgEntryQty > 100 {
+			if absAvgEntryQty > self.AlertPos {
 				closingPos := &ActionOrder{
 					Action: ACTION_CLOSING,
 					Amount: absAvgEntryQty,
