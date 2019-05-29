@@ -42,12 +42,12 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		Depth:           &Depth{},
 		OrderBook:       &OrderBook{},
 		ProcessLock:     &sync.RWMutex{},
-		AlertPos:        1000,
-		MaxPos:          5000,
+		AlertPos:        500,
+		MaxPos:          3000,
 		MinDiffPrice:    3,
 		MaxDiffPrice:    20,
 		TimeStep:        time.Second * 30,
-		CancelOrderStep: time.Second * 150,
+		CancelOrderStep: time.Second * 90,
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
@@ -456,7 +456,7 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 			self.Output.Warnf("极端行情, 不做, %.2f : %.2f", bidRatio, askRatio)
 			return nil, nil, errors.New("stop!")
 		}
-		self.Output.Logf("市场当前多空量比, %.2f : %.2f", bidRatio, askRatio)
+		self.Output.Logf("市场10档多空量比, %.2f : %.2f", bidRatio, askRatio)
 
 		maxAmount := self.BaseAmount * 2
 		bidAmount = math.Ceil(maxAmount * bidRatio)
@@ -466,6 +466,16 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 			self.Output.Warnf("市场量级发生了错误, 不做, %.2f : %.2f", bidAmount, askAmount)
 			return nil, nil, errors.New("stop!")
 		}
+	}
+
+	if self.AvgEntryQty != 0 {
+		tmpV := math.Ceil(math.Abs(self.AvgEntryQty / 20))
+		if self.AvgEntryQty > 0 {
+			askAmount += tmpV
+		} else {
+			bidAmount += tmpV
+		}
+		self.Output.Log("持仓增量", self.AvgEntryQty, tmpV)
 	}
 
 	reasonablePrice = math.Floor(middlePrice + 0.5)
