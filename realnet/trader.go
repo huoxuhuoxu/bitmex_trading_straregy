@@ -45,7 +45,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		AlertPos:        1000,
 		MaxPos:          5000,
 		MinDiffPrice:    3,
-		MaxDiffPrice:    18,
+		MaxDiffPrice:    20,
 		TimeStep:        time.Second * 30,
 		CancelOrderStep: time.Second * 150,
 		Exchange:        nil,
@@ -403,7 +403,7 @@ func (self *Trader) ClosingPos() {
 			self.ProcessLock.RUnlock()
 
 			absAvgEntryQty := math.Abs(avgEntryQty)
-			if realMiddlePrice > 100 {
+			if absAvgEntryQty > 100 {
 				closingPos := &ActionOrder{
 					Action: ACTION_CLOSING,
 					Amount: absAvgEntryQty,
