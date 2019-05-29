@@ -464,7 +464,7 @@ func (self *Trader) ClosingPos() {
 				avgEntryPrice := self.PositionInfo.AvgEntryPrice
 				self.ProcessLock.RUnlock()
 
-				if avgEntryPrice != 0 && math.Abs(realMiddlePrice-avgEntryPrice) >= 30 {
+				if avgEntryPrice != 0 && math.Abs(realMiddlePrice-avgEntryPrice) >= 50 {
 					if avgEntryQty != 0 {
 						closingPos := &ActionOrder{
 							Action: ACTION_CLOSING,
