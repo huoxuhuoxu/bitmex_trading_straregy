@@ -44,10 +44,10 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		ProcessLock:     &sync.RWMutex{},
 		AlertPos:        1000,
 		MaxPos:          5000,
-		MinDiffPrice:    3.5,
+		MinDiffPrice:    3,
 		MaxDiffPrice:    18,
-		TimeStep:        time.Second * 45,
-		CancelOrderStep: time.Second * 225,
+		TimeStep:        time.Second * 30,
+		CancelOrderStep: time.Second * 150,
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
@@ -388,7 +388,7 @@ func (self *Trader) getWallet() {
 
 // 平仓
 func (self *Trader) ClosingPos() {
-	chanTick := time.Tick(time.Hour * 2)
+	chanTick := time.Tick(time.Hour * 1)
 	for {
 		self.Output.Log("closing pos running ...")
 		<-chanTick
