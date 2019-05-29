@@ -399,26 +399,27 @@ func (self *Trader) ClosingPos() {
 		default:
 			self.ProcessLock.RLock()
 			avgEntryQty := self.PositionInfo.AvgEntryQty
-			avgEntryPrice := self.PositionInfo.AvgEntryPrice
+			realMiddlePrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
 			self.ProcessLock.RUnlock()
 
 			absAvgEntryQty := math.Abs(avgEntryQty)
-			if absAvgEntryQty > self.AlertPos {
+			if realMiddlePrice > 100 {
 				closingPos := &ActionOrder{
 					Action: ACTION_CLOSING,
 					Amount: absAvgEntryQty,
 				}
 				if avgEntryQty > 0 {
 					closingPos.Side = TraderSell
-					closingPos.Price = math.Ceil(avgEntryPrice + 6)
+					closingPos.Price = math.Ceil(realMiddlePrice - 3)
 				} else {
 					closingPos.Side = TraderBuy
-					closingPos.Price = math.Floor(avgEntryPrice - 6)
+					closingPos.Price = math.Floor(realMiddlePrice + 3)
 				}
 
 				self.chanOrders <- closingPos
+				self.Output.Info("closing pos", closingPos.Side, closingPos.Price, closingPos.Amount)
 			} else {
-				self.Output.Warn("give jumper", avgEntryQty, avgEntryPrice)
+				self.Output.Warn("give jumper", avgEntryQty)
 			}
 		}
 	}
@@ -429,6 +430,9 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 	var (
 		bidPrice, askPrice, bidAmount, askAmount, middlePrice, reasonablePrice float64
 	)
+
+	bidAmount = self.BaseAmount
+	askAmount = self.BaseAmount
 
 	self.ProcessLock.RLock()
 	defer self.ProcessLock.RUnlock()
@@ -450,6 +454,16 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 
 		if bidRatio < 0.15 || askRatio < 0.15 {
 			self.Output.Warnf("极端行情, 不做, %.2f : %.2f", bidRatio, askRatio)
+			return nil, nil, errors.New("stop!")
+		}
+		self.Output.Logf("市场当前多空量比, %.2f : %.2f", bidRatio, askRatio)
+
+		maxAmount := self.BaseAmount * 2
+		bidAmount = math.Ceil(maxAmount * bidRatio)
+		askAmount = math.Ceil(maxAmount * askRatio)
+
+		if bidAmount > maxAmount || askAmount > maxAmount {
+			self.Output.Warnf("市场量级发生了错误, 不做, %.2f : %.2f", bidAmount, askAmount)
 			return nil, nil, errors.New("stop!")
 		}
 	}
@@ -481,9 +495,6 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 			}
 		}
 	}
-
-	bidAmount = self.BaseAmount
-	askAmount = self.BaseAmount
 
 	return &PlaceOrderParams{bidPrice, bidAmount}, &PlaceOrderParams{askPrice, askAmount}, nil
 }
