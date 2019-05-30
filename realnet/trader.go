@@ -15,7 +15,6 @@ type Trader struct {
 	*MainControl                              // 主控
 	ApiKey, SecretKey string                  // key
 	Depth             *Depth                  // bitmex depth
-	OrderBook         *OrderBook              // bitmex orderbook
 	ProcessLock       *sync.RWMutex           // 执行流程锁
 	AlertPos          float64                 // 持仓禁戒线(调整挂单比例)
 	MaxPos            float64                 // 最大持仓
@@ -39,14 +38,13 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		ApiKey:          apiKey,
 		SecretKey:       secretKey,
 		Depth:           &Depth{},
-		OrderBook:       &OrderBook{},
 		ProcessLock:     &sync.RWMutex{},
-		AlertPos:        1000,
-		MaxPos:          3000,
-		MinDiffPrice:    4,
-		MaxDiffPrice:    12,
-		TimeStep:        time.Second * 30,
-		CancelOrderStep: time.Second * 300,
+		AlertPos:        1500,
+		MaxPos:          4000,
+		MinDiffPrice:    10,
+		MaxDiffPrice:    30,
+		TimeStep:        time.Second * 60,
+		CancelOrderStep: time.Second * 600,
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
@@ -97,7 +95,7 @@ func (self *Trader) wsExceptHandler(wsConn *conn.WsConn, err error) {
 	}
 }
 
-// 接收ws推送的orderbook
+// 接收ws推送的depth
 func (self *Trader) wsReceiveMessage() {
 	wsConn, err := conn.NewWsConn(
 		goex.BITMEX,
@@ -331,7 +329,7 @@ func (self *Trader) readyPlaceOrders() {
 
 // 获取当前持仓情况
 func (self *Trader) getPosition() {
-	chanTick := time.Tick(self.TimeStep * 2)
+	chanTick := time.Tick(self.TimeStep)
 	for {
 		select {
 		case <-self.Ctx.Done():
@@ -370,7 +368,7 @@ func (self *Trader) ClosingPos() {
 	// 长时间定时平仓: 防止爆仓
 	go func() {
 		self.Output.Log("closing pos 1 running ...")
-		chanTick := time.Tick(time.Hour * 1)
+		chanTick := time.Tick(time.Hour * 2)
 		for {
 			<-chanTick
 			select {
@@ -406,51 +404,51 @@ func (self *Trader) ClosingPos() {
 		}
 	}()
 	// 根据市场随时准备平仓
-	go func() {
-		self.Output.Log("closing pos 2 running ...")
-		chanTick := time.Tick(time.Second * 60)
-		for {
-			<-chanTick
-			select {
-			case <-self.Ctx.Done():
-				self.Output.Log("chan closing pos 2, closed")
-				return
-			default:
-				self.ProcessLock.RLock()
-				avgEntryQty := self.PositionInfo.AvgEntryQty
-				realMiddlePrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
-				avgEntryPrice := self.PositionInfo.AvgEntryPrice
-				self.ProcessLock.RUnlock()
+	// go func() {
+	// 	self.Output.Log("closing pos 2 running ...")
+	// 	chanTick := time.Tick(time.Second * 120)
+	// 	for {
+	// 		<-chanTick
+	// 		select {
+	// 		case <-self.Ctx.Done():
+	// 			self.Output.Log("chan closing pos 2, closed")
+	// 			return
+	// 		default:
+	// 			self.ProcessLock.RLock()
+	// 			avgEntryQty := self.PositionInfo.AvgEntryQty
+	// 			realMiddlePrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
+	// 			avgEntryPrice := self.PositionInfo.AvgEntryPrice
+	// 			self.ProcessLock.RUnlock()
 
-				absAvgEntryQty := math.Abs(avgEntryQty)
-				if absAvgEntryQty > 100 {
-					closingPos := &ActionOrder{
-						Action: ACTION_CLOSING,
-						Amount: absAvgEntryQty,
-					}
-					// 持有多头头寸
-					if avgEntryQty > 0 && (realMiddlePrice > (avgEntryPrice + 20)) {
-						closingPos.Side = TraderSell
-						closingPos.Price = math.Ceil(realMiddlePrice - 3)
-						self.chanOrders <- closingPos
-						self.Output.Info("closing pos 2", closingPos.Side, closingPos.Price, closingPos.Amount)
-					}
+	// 			absAvgEntryQty := math.Abs(avgEntryQty)
+	// 			if absAvgEntryQty > 100 {
+	// 				closingPos := &ActionOrder{
+	// 					Action: ACTION_CLOSING,
+	// 					Amount: absAvgEntryQty,
+	// 				}
+	// 				// 持有多头头寸
+	// 				if avgEntryQty > 0 && (realMiddlePrice > (avgEntryPrice + 30)) {
+	// 					closingPos.Side = TraderSell
+	// 					closingPos.Price = math.Ceil(realMiddlePrice - 3)
+	// 					self.chanOrders <- closingPos
+	// 					self.Output.Info("closing pos 2", closingPos.Side, closingPos.Price, closingPos.Amount)
+	// 				}
 
-					// 持有空头头寸
-					if avgEntryQty < 0 && (realMiddlePrice < (avgEntryPrice - 20)) {
-						closingPos.Side = TraderBuy
-						closingPos.Price = math.Floor(realMiddlePrice + 3)
-						self.chanOrders <- closingPos
-						self.Output.Info("closing pos 2", closingPos.Side, closingPos.Price, closingPos.Amount)
-					}
-				}
-			}
-		}
-	}()
-	// 超过30个点亏损, 平仓
+	// 				// 持有空头头寸
+	// 				if avgEntryQty < 0 && (realMiddlePrice < (avgEntryPrice - 30)) {
+	// 					closingPos.Side = TraderBuy
+	// 					closingPos.Price = math.Floor(realMiddlePrice + 3)
+	// 					self.chanOrders <- closingPos
+	// 					self.Output.Info("closing pos 2", closingPos.Side, closingPos.Price, closingPos.Amount)
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }()
+	// 超过30个点, 平仓
 	go func() {
 		self.Output.Log("closing pos 3 running ...")
-		chanTick := time.Tick(time.Second * 60)
+		chanTick := time.Tick(time.Second * 120)
 		for {
 			<-chanTick
 			select {
@@ -465,21 +463,19 @@ func (self *Trader) ClosingPos() {
 				self.ProcessLock.RUnlock()
 
 				if avgEntryPrice != 0 && math.Abs(realMiddlePrice-avgEntryPrice) >= 30 {
-					if avgEntryQty != 0 {
-						closingPos := &ActionOrder{
-							Action: ACTION_CLOSING,
-							Amount: math.Abs(avgEntryQty),
-						}
-						if avgEntryQty > 0 {
-							closingPos.Side = TraderSell
-							closingPos.Price = math.Ceil(realMiddlePrice - 3)
-						} else {
-							closingPos.Side = TraderBuy
-							closingPos.Price = math.Floor(realMiddlePrice + 3)
-						}
-						self.chanOrders <- closingPos
-						self.Output.Warn("亏损过线, 启动平仓", closingPos.Side, closingPos.Price, closingPos.Amount)
+					closingPos := &ActionOrder{
+						Action: ACTION_CLOSING,
+						Amount: math.Abs(avgEntryQty),
 					}
+					if avgEntryQty > 0 {
+						closingPos.Side = TraderSell
+						closingPos.Price = math.Ceil(realMiddlePrice - 3)
+					} else {
+						closingPos.Side = TraderBuy
+						closingPos.Price = math.Floor(realMiddlePrice + 3)
+					}
+					self.chanOrders <- closingPos
+					self.Output.Warn("持仓与市场价偏移30个点, 启动自动平仓", realMiddlePrice, closingPos.Side, closingPos.Price, closingPos.Amount)
 				}
 			}
 		}

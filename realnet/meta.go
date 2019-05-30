@@ -8,17 +8,6 @@ type Depth struct {
 	Sell float64
 }
 
-// real orderbook
-type GearPosition struct {
-	Price  float64
-	Amount float64
-}
-
-type OrderBook struct {
-	Bids []GearPosition
-	Asks []GearPosition
-}
-
 // 订单行为
 type ActionType int
 
