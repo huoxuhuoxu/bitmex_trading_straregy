@@ -72,7 +72,6 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 func (self *Trader) Running() {
 	self.wsReceiveMessage()
 	go self.handerList()
-	// go self.getWallet()
 	go self.getPosition()
 	go self.readyPlaceOrders()
 	go self.ClosingPos()
@@ -285,7 +284,6 @@ func (self *Trader) readyPlaceOrders() {
 					if n.Sub(poOrder.Time) > self.CancelOrderStep {
 						delete(self.poOrders, ID)
 						poOrder.Action = ACTION_CO
-						// self.Output.Infof("ready cancel order %+v", poOrder)
 						self.chanOrders <- poOrder
 					}
 					count++
@@ -320,7 +318,6 @@ func (self *Trader) readyPlaceOrders() {
 			Price:  askParams.Price,
 			Side:   TraderSell,
 		}
-		// log.Printf("%+v %+v", buyOrder, sellOrder)
 
 		self.chanOrders <- buyOrder
 		self.chanOrders <- sellOrder
@@ -329,7 +326,7 @@ func (self *Trader) readyPlaceOrders() {
 
 // 获取当前持仓情况
 func (self *Trader) getPosition() {
-	chanTick := time.Tick(self.TimeStep)
+	chanTick := time.Tick(time.Second * 30)
 	for {
 		select {
 		case <-self.Ctx.Done():
@@ -345,30 +342,12 @@ func (self *Trader) getPosition() {
 	}
 }
 
-// 获取账户信息
-func (self *Trader) getWallet() {
-	chanTick := time.Tick(time.Minute)
-	for {
-		select {
-		case <-self.Ctx.Done():
-			self.Output.Log("chan get wallet, closed")
-			return
-		default:
-			wallet := &ActionOrder{
-				Action: ACTION_WALLET,
-			}
-			self.chanOrders <- wallet
-		}
-		<-chanTick
-	}
-}
-
 // 平仓
 func (self *Trader) ClosingPos() {
 	// 长时间定时平仓: 防止爆仓
 	go func() {
 		self.Output.Log("closing pos 1 running ...")
-		chanTick := time.Tick(time.Hour * 2)
+		chanTick := time.Tick(time.Hour)
 		for {
 			<-chanTick
 			select {
@@ -389,10 +368,10 @@ func (self *Trader) ClosingPos() {
 					}
 					if avgEntryQty > 0 {
 						closingPos.Side = TraderSell
-						closingPos.Price = math.Ceil(realMiddlePrice - 3)
+						closingPos.Price = math.Ceil(realMiddlePrice - 5)
 					} else {
 						closingPos.Side = TraderBuy
-						closingPos.Price = math.Floor(realMiddlePrice + 3)
+						closingPos.Price = math.Floor(realMiddlePrice + 5)
 					}
 
 					self.chanOrders <- closingPos
@@ -403,52 +382,11 @@ func (self *Trader) ClosingPos() {
 			}
 		}
 	}()
-	// 根据市场随时准备平仓
-	// go func() {
-	// 	self.Output.Log("closing pos 2 running ...")
-	// 	chanTick := time.Tick(time.Second * 120)
-	// 	for {
-	// 		<-chanTick
-	// 		select {
-	// 		case <-self.Ctx.Done():
-	// 			self.Output.Log("chan closing pos 2, closed")
-	// 			return
-	// 		default:
-	// 			self.ProcessLock.RLock()
-	// 			avgEntryQty := self.PositionInfo.AvgEntryQty
-	// 			realMiddlePrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
-	// 			avgEntryPrice := self.PositionInfo.AvgEntryPrice
-	// 			self.ProcessLock.RUnlock()
 
-	// 			absAvgEntryQty := math.Abs(avgEntryQty)
-	// 			if absAvgEntryQty > 100 {
-	// 				closingPos := &ActionOrder{
-	// 					Action: ACTION_CLOSING,
-	// 					Amount: absAvgEntryQty,
-	// 				}
-	// 				// 持有多头头寸
-	// 				if avgEntryQty > 0 && (realMiddlePrice > (avgEntryPrice + 30)) {
-	// 					closingPos.Side = TraderSell
-	// 					closingPos.Price = math.Ceil(realMiddlePrice - 3)
-	// 					self.chanOrders <- closingPos
-	// 					self.Output.Info("closing pos 2", closingPos.Side, closingPos.Price, closingPos.Amount)
-	// 				}
-
-	// 				// 持有空头头寸
-	// 				if avgEntryQty < 0 && (realMiddlePrice < (avgEntryPrice - 30)) {
-	// 					closingPos.Side = TraderBuy
-	// 					closingPos.Price = math.Floor(realMiddlePrice + 3)
-	// 					self.chanOrders <- closingPos
-	// 					self.Output.Info("closing pos 2", closingPos.Side, closingPos.Price, closingPos.Amount)
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }()
 	// 超过30个点, 平仓
 	go func() {
 		self.Output.Log("closing pos 3 running ...")
-		chanTick := time.Tick(time.Second * 120)
+		chanTick := time.Tick(time.Second * 60)
 		for {
 			<-chanTick
 			select {
@@ -462,17 +400,17 @@ func (self *Trader) ClosingPos() {
 				avgEntryPrice := self.PositionInfo.AvgEntryPrice
 				self.ProcessLock.RUnlock()
 
-				if avgEntryPrice != 0 && math.Abs(realMiddlePrice-avgEntryPrice) >= 30 {
+				if avgEntryPrice != 0 && math.Abs(realMiddlePrice-avgEntryPrice) > 30 {
 					closingPos := &ActionOrder{
 						Action: ACTION_CLOSING,
 						Amount: math.Abs(avgEntryQty),
 					}
 					if avgEntryQty > 0 {
 						closingPos.Side = TraderSell
-						closingPos.Price = math.Ceil(realMiddlePrice - 3)
+						closingPos.Price = math.Ceil(realMiddlePrice - 5)
 					} else {
 						closingPos.Side = TraderBuy
-						closingPos.Price = math.Floor(realMiddlePrice + 3)
+						closingPos.Price = math.Floor(realMiddlePrice + 5)
 					}
 					self.chanOrders <- closingPos
 					self.Output.Warn("持仓与市场价偏移30个点, 启动自动平仓", realMiddlePrice, closingPos.Side, closingPos.Price, closingPos.Amount)
