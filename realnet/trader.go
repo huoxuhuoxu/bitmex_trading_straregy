@@ -70,6 +70,23 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 }
 
 func (self *Trader) Running() {
+	// 运行前将现有挂单全部撤离
+	orders, err := self.Exchange.UnfinishOrders()
+	if err != nil {
+		self.Output.Error("get unfinish orders failed", err)
+	} else {
+		if len(orders) > 0 {
+			self.Output.Info("ready before running, cancel old order", len(orders))
+			for _, order := range orders {
+				_, err := self.Exchange.CancelOrder(order.OrderID2)
+				if err != nil {
+					self.Output.Error("ready before running, cancel order failed", err)
+				}
+			}
+		}
+	}
+
+	// running
 	self.wsReceiveMessage()
 	go self.handerList()
 	go self.getPosition()
@@ -104,13 +121,17 @@ func (self *Trader) wsReceiveMessage() {
 		nil,
 	)
 	if err != nil {
-		self.Output.Fatal("new ws conn", err)
+		self.Output.Error("new ws conn", err)
+		self.Sr.RestartProcess()
+		return
 	}
 	wsConn.SetSubscribe([]string{"orderBookL2_25:XBTUSD"})
 
 	err = wsConn.Connect()
 	if err != nil {
-		self.Output.Fatal("ws error", err)
+		self.Output.Error("ws error", err)
+		self.Sr.RestartProcess()
+		return
 	}
 
 	wsConn.ReceiveMessage(func(data interface{}) {
@@ -132,8 +153,19 @@ func (self *Trader) wsReceiveMessage() {
 
 			// depth
 			if depthPair.Buy != self.Depth.Buy || depthPair.Sell != self.Depth.Sell {
+				var t time.Time
+				if self.Depth.UpdatedAt != t {
+					t = time.Now()
+					if t.Sub(self.Depth.UpdatedAt) > time.Minute*5 {
+						self.Output.Warn("depth error, 长时间没有变动过了!")
+						self.Sr.RestartProcess()
+						return
+					}
+				}
+
 				self.Depth.Buy = depthPair.Buy
 				self.Depth.Sell = depthPair.Sell
+				self.Depth.UpdatedAt = time.Now()
 				self.Output.Logf("real depth %+v", self.Depth)
 			}
 		}
@@ -326,7 +358,7 @@ func (self *Trader) readyPlaceOrders() {
 
 // 获取当前持仓情况
 func (self *Trader) getPosition() {
-	chanTick := time.Tick(time.Second * 30)
+	chanTick := time.Tick(time.Second * 20)
 	for {
 		select {
 		case <-self.Ctx.Done():
@@ -386,7 +418,7 @@ func (self *Trader) ClosingPos() {
 	// 超过30个点, 平仓
 	go func() {
 		self.Output.Log("closing pos 3 running ...")
-		chanTick := time.Tick(time.Second * 60)
+		chanTick := time.Tick(time.Second * 120)
 		for {
 			<-chanTick
 			select {

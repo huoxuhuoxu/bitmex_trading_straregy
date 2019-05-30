@@ -4,8 +4,9 @@ import "time"
 
 // real depth
 type Depth struct {
-	Buy  float64
-	Sell float64
+	Buy       float64
+	Sell      float64
+	UpdatedAt time.Time // depth 最后一次更新的时间
 }
 
 // 订单行为

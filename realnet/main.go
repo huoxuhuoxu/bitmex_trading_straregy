@@ -54,7 +54,10 @@ func main() {
 	trader := NewTrader(API_KEY, SECRET_KEY, mc, *isDebug)
 	trader.Running()
 
+	// 12小时自动重启
+	mc.Sr.AutoRestartProcess(nil)
 	mc.Output.Log("succ, starting ...")
+
 end:
 	for {
 		select {
