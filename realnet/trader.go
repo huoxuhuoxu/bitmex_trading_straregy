@@ -48,7 +48,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
-		BaseAmount:      75,
+		BaseAmount:      50,
 		isRunning:       true,
 		PositionInfo:    &PositionInfo{},
 		chanOrders:      make(chan *ActionOrder, 1),
@@ -358,7 +358,7 @@ func (self *Trader) readyPlaceOrders() {
 
 // 获取当前持仓情况
 func (self *Trader) getPosition() {
-	chanTick := time.Tick(time.Second * 15)
+	chanTick := time.Tick(time.Second * 20)
 	for {
 		select {
 		case <-self.Ctx.Done():
@@ -379,7 +379,7 @@ func (self *Trader) ClosingPos() {
 	// 长时间定时平仓: 防止爆仓
 	go func() {
 		self.Output.Log("closing pos 1 running ...")
-		chanTick := time.Tick(time.Minute * 90)
+		chanTick := time.Tick(time.Hour * 2)
 		for {
 			<-chanTick
 			select {
@@ -418,7 +418,7 @@ func (self *Trader) ClosingPos() {
 	// 超过30个点, 平仓
 	go func() {
 		self.Output.Log("closing pos 3 running ...")
-		chanTick := time.Tick(time.Second * 60)
+		chanTick := time.Tick(time.Minute * 2)
 		for {
 			<-chanTick
 			select {
@@ -439,10 +439,10 @@ func (self *Trader) ClosingPos() {
 					}
 					if avgEntryQty > 0 {
 						closingPos.Side = TraderSell
-						closingPos.Price = math.Ceil(realMiddlePrice - 5)
+						closingPos.Price = math.Ceil(realMiddlePrice - 3)
 					} else {
 						closingPos.Side = TraderBuy
-						closingPos.Price = math.Floor(realMiddlePrice + 5)
+						closingPos.Price = math.Floor(realMiddlePrice + 3)
 					}
 					self.chanOrders <- closingPos
 					self.Output.Warn("持仓与市场价偏移30个点, 启动自动平仓", realMiddlePrice, closingPos.Side, closingPos.Price, closingPos.Amount)
