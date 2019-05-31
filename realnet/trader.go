@@ -379,7 +379,7 @@ func (self *Trader) ClosingPos() {
 	// 长时间定时平仓: 防止爆仓
 	go func() {
 		self.Output.Log("closing pos 1 running ...")
-		chanTick := time.Tick(time.Hour)
+		chanTick := time.Tick(time.Hour * 2)
 		for {
 			<-chanTick
 			select {
