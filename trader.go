@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"sync"
@@ -30,6 +32,7 @@ type Trader struct {
 	*PositionInfo                             // 账号运行时
 	chanOrders        chan *ActionOrder       // 订单处理管道
 	poOrders          map[string]*ActionOrder // 下成功的订单
+	*Volatility
 }
 
 func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader {
@@ -53,6 +56,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		PositionInfo:    &PositionInfo{},
 		chanOrders:      make(chan *ActionOrder, 1),
 		poOrders:        make(map[string]*ActionOrder, 0),
+		Volatility:      NewVolatility(20),
 	}
 
 	self.Exchange = conn.NewConn(
@@ -375,7 +379,7 @@ func (self *Trader) getPosition() {
 }
 
 // 平仓
-func (self *Trader) ClosingPos() {
+func (self *Trader) IntervalClosingPos() {
 	// 长时间定时平仓: 防止爆仓
 	go func() {
 		self.Output.Log("closing pos 1 running ...")
@@ -389,27 +393,10 @@ func (self *Trader) ClosingPos() {
 			default:
 				self.ProcessLock.RLock()
 				avgEntryQty := self.PositionInfo.AvgEntryQty
-				realMiddlePrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
 				self.ProcessLock.RUnlock()
 
-				absAvgEntryQty := math.Abs(avgEntryQty)
-				if absAvgEntryQty > self.AlertPos {
-					closingPos := &ActionOrder{
-						Action: ACTION_CLOSING,
-						Amount: absAvgEntryQty,
-					}
-					if avgEntryQty > 0 {
-						closingPos.Side = TraderSell
-						closingPos.Price = math.Ceil(realMiddlePrice - 5)
-					} else {
-						closingPos.Side = TraderBuy
-						closingPos.Price = math.Floor(realMiddlePrice + 5)
-					}
-
-					self.chanOrders <- closingPos
-					self.Output.Info("closing pos", closingPos.Side, closingPos.Price, closingPos.Amount)
-				} else {
-					self.Output.Warn("give jumper", avgEntryQty)
+				if math.Abs(avgEntryQty) > self.AlertPos {
+					self.closingPos("定时平仓")
 				}
 			}
 		}
@@ -427,25 +414,12 @@ func (self *Trader) ClosingPos() {
 				return
 			default:
 				self.ProcessLock.RLock()
-				avgEntryQty := self.PositionInfo.AvgEntryQty
-				realMiddlePrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
 				avgEntryPrice := self.PositionInfo.AvgEntryPrice
+				marketPrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
 				self.ProcessLock.RUnlock()
 
-				if avgEntryPrice != 0 && math.Abs(realMiddlePrice-avgEntryPrice) > 30 {
-					closingPos := &ActionOrder{
-						Action: ACTION_CLOSING,
-						Amount: math.Abs(avgEntryQty),
-					}
-					if avgEntryQty > 0 {
-						closingPos.Side = TraderSell
-						closingPos.Price = math.Ceil(realMiddlePrice - 3)
-					} else {
-						closingPos.Side = TraderBuy
-						closingPos.Price = math.Floor(realMiddlePrice + 3)
-					}
-					self.chanOrders <- closingPos
-					self.Output.Warn("持仓与市场价偏移30个点, 启动自动平仓", realMiddlePrice, closingPos.Side, closingPos.Price, closingPos.Amount)
+				if avgEntryPrice != 0 && math.Abs(marketPrice-avgEntryPrice) > 30 {
+					self.closingPos("市场价高于/低于持有价格的30个点")
 				}
 			}
 		}
@@ -454,32 +428,88 @@ func (self *Trader) ClosingPos() {
 
 // 策略 - 计算根据持仓计算合理价格
 func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderParams, error) {
-	var (
-		bidPrice, askPrice, bidAmount, askAmount, reasonablePrice float64
-	)
-
 	self.ProcessLock.RLock()
 	defer self.ProcessLock.RUnlock()
-	reasonablePrice = math.Floor((self.Depth.Buy+self.Depth.Sell)/2 + 0.5)
+
+	// 市场中间价
+	var reasonablePrice = math.Floor((self.Depth.Buy+self.Depth.Sell)/2 + 0.5)
 	self.Output.Info("中间价", reasonablePrice)
 
-	bidPrice = reasonablePrice - self.MinDiffPrice
-	askPrice = reasonablePrice + self.MinDiffPrice
-	if self.PositionInfo != nil {
-		var diffPrice float64
-		qty := math.Abs(self.PositionInfo.AvgEntryQty)
-		// 总量大于允许持仓总量
-		if qty > self.MaxPos {
-			diffPrice = self.MaxDiffPrice
-		} else {
-			diffQty := qty - self.AlertPos
-			// 超过警戒线了
-			if diffQty > 0 {
-				diffPrice = qty / self.MaxPos * self.MaxDiffPrice
+	// 波动率
+	if pastVol, ok := self.IsHighVolatility(reasonablePrice); ok {
+		errMsg := fmt.Sprintf("volatility is high: .1f", pastVol-reasonablePrice)
+		return nil, nil, errors.New(errMsg)
+	} else {
+		self.Output.Logf("volatility: %.1f", pastVol-reasonablePrice)
+	}
+
+	/*
+		@README
+			仓位平衡
+
+		1. 计算挂单列表上两边的待成交量
+		2. 与当前持仓计算差值, 得到某方向需要的增加量
+	*/
+	var bidAmount = self.BaseAmount
+	var askAmount = self.BaseAmount
+	var tmpAskAmount, tmpBidAmount, tmpDiffAmount float64
+	for _, order := range self.poOrders {
+		switch order.Side {
+		case TraderSell:
+			tmpAskAmount -= order.Amount
+		case TraderBuy:
+			tmpBidAmount += order.Amount
+		}
+	}
+	// 待成交列表, 正: 买量多, 负: 卖量多
+	if self.AvgEntryQty > 0 {
+		tmpBidAmount += self.AvgEntryQty
+	}
+	if self.AvgEntryQty < 0 {
+		tmpAskAmount += self.AvgEntryQty
+	}
+
+	tmpDiffAmount = tmpBidAmount + tmpAskAmount
+	if tmpDiffAmount > 0 {
+		askAmount += tmpDiffAmount
+	}
+	if tmpDiffAmount < 0 {
+		bidAmount += tmpDiffAmount
+	}
+
+	/*
+		@README
+			计算两边的合理价格
+
+		持仓为空时, 持仓价格为0, 以市场价格为准
+		持仓不为空时, 下单价格
+			1. 持仓 能够获利的情况下, 按持仓价为准
+			2. 持仓 不能够获利情况下, 按市场价为准
+	*/
+	var bidPrice = self.Depth.Buy - self.MinDiffPrice
+	var askPrice = self.Depth.Sell + self.MinDiffPrice
+	if self.AvgEntryPrice > 0 {
+		// 多头头寸
+		if self.AvgEntryQty > 0 {
+			if self.AvgEntryPrice <= bidPrice {
+				askPrice = self.AvgEntryPrice + self.MinDiffPrice
+			}
+		}
+		// 空头头寸
+		if self.AvgEntryQty < 0 {
+			if self.AvgEntryPrice >= askPrice {
+				bidPrice = self.AvgEntryPrice - self.MinDiffPrice
 			}
 		}
 
-		if diffPrice != 0 {
+		return &PlaceOrderParams{bidPrice, bidAmount}, &PlaceOrderParams{askPrice, askAmount}, nil
+	}
+
+	// 按照量偏移, 计算价格偏移
+	if self.PositionInfo != nil {
+		qty := math.Abs(self.PositionInfo.AvgEntryQty)
+		if qty > self.AlertPos {
+			diffPrice := qty / self.MaxPos * self.MaxDiffPrice
 			if self.PositionInfo.AvgEntryQty > 0 {
 				bidPrice = math.Floor(reasonablePrice - diffPrice)
 			} else {
@@ -488,8 +518,30 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		}
 	}
 
-	bidAmount = self.BaseAmount
-	askAmount = self.BaseAmount
-
 	return &PlaceOrderParams{bidPrice, bidAmount}, &PlaceOrderParams{askPrice, askAmount}, nil
+}
+
+// 平仓
+func (self *Trader) closingPos(closePosName string) {
+	self.ProcessLock.RLock()
+	avgEntryQty := self.PositionInfo.AvgEntryQty
+	marketPrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
+	self.ProcessLock.RUnlock()
+
+	closingPos := &ActionOrder{
+		Action: ACTION_CLOSING,
+		Amount: math.Abs(avgEntryQty),
+	}
+
+	if avgEntryQty > 0 {
+		closingPos.Side = TraderSell
+		closingPos.Price = math.Ceil(marketPrice - 5)
+	}
+	if avgEntryQty < 0 {
+		closingPos.Side = TraderBuy
+		closingPos.Price = math.Floor(marketPrice + 5)
+	}
+
+	self.chanOrders <- closingPos
+	self.Output.Warn("closing pos, 开始平仓", closePosName, closingPos.Side, closingPos.Price, math.Abs(avgEntryQty))
 }
