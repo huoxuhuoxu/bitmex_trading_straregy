@@ -486,6 +486,14 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		bidAmount += math.Abs(tmpDiffAmount)
 	}
 
+	// 补丁!!!
+	if bidAmount >= 150 {
+		bidAmount = self.BaseAmount
+	}
+	if askAmount >= 150 {
+		askAmount = self.BaseAmount
+	}
+
 	/*
 		@README
 			计算两边的合理价格
