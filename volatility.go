@@ -1,10 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"sync"
 	"time"
 )
+
+type VolatilityError struct {
+	PastV   float64
+	marketV float64
+}
+
+func (self *VolatilityError) Error() string {
+	return fmt.Sprintf("volatility is high: %.1f", self.PastV-self.marketV)
+}
 
 type Volatility struct {
 	UpdatedAt     time.Time   // 最新更新时间

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"math"
 	"net/http"
 	"sync"
@@ -56,7 +54,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		PositionInfo:    &PositionInfo{},
 		chanOrders:      make(chan *ActionOrder, 1),
 		poOrders:        make(map[string]*ActionOrder, 0),
-		Volatility:      NewVolatility(20),
+		Volatility:      NewVolatility(18),
 	}
 
 	self.Exchange = conn.NewConn(
@@ -339,6 +337,17 @@ func (self *Trader) readyPlaceOrders() {
 		bidParams, askParams, err := self.calculateReasonablePrice()
 		if err != nil {
 			self.Output.Warn(err)
+			switch err.(type) {
+			case *VolatilityError:
+				self.ProcessLock.RLock()
+				avgEntryPrice := self.PositionInfo.AvgEntryPrice
+				marketPrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
+				self.ProcessLock.RUnlock()
+
+				if avgEntryPrice != 0 && math.Abs(marketPrice-avgEntryPrice) > 30 {
+					self.closingPos("波动率过高, 市场价 高于/低于 持有价格的30个点")
+				}
+			}
 			continue
 		}
 
@@ -437,8 +446,8 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 
 	// 波动率
 	if pastVol, ok := self.IsHighVolatility(reasonablePrice); ok {
-		errMsg := fmt.Sprintf("volatility is high: %.1f", pastVol-reasonablePrice)
-		return nil, nil, errors.New(errMsg)
+		ve := &VolatilityError{pastVol, reasonablePrice}
+		return nil, nil, ve
 	} else {
 		self.Output.Logf("volatility: %.1f", pastVol-reasonablePrice)
 	}
@@ -474,7 +483,7 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		askAmount += tmpDiffAmount
 	}
 	if tmpDiffAmount < 0 {
-		bidAmount += tmpDiffAmount
+		bidAmount += math.Abs(tmpDiffAmount)
 	}
 
 	/*
