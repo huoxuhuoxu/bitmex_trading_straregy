@@ -48,7 +48,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
-		BaseAmount:      100,
+		BaseAmount:      75,
 		isRunning:       true,
 		PositionInfo:    &PositionInfo{},
 		chanOrders:      make(chan *ActionOrder, 1),
