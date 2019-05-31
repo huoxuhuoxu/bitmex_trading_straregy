@@ -30,6 +30,7 @@ type Trader struct {
 	*PositionInfo                             // 账号运行时
 	chanOrders        chan *ActionOrder       // 订单处理管道
 	poOrders          map[string]*ActionOrder // 下成功的订单
+	isClosingPos      bool                    // 是否处于平仓中
 	*Volatility
 }
 
@@ -486,7 +487,7 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		bidAmount += math.Abs(tmpDiffAmount)
 	}
 
-	// 补丁!!!
+	// 补丁!!!, 在没撤单前, 成交会算进偏差内, 需要处理变更
 	if bidAmount >= 150 {
 		bidAmount = self.BaseAmount
 	}
@@ -540,10 +541,16 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 
 // 平仓
 func (self *Trader) closingPos(closePosName string) {
-	self.ProcessLock.RLock()
+	self.ProcessLock.Lock()
 	avgEntryQty := self.PositionInfo.AvgEntryQty
 	marketPrice := math.Ceil((self.Depth.Sell + self.Depth.Buy) / 2)
-	self.ProcessLock.RUnlock()
+	if self.isClosingPos {
+		self.Output.Warn("处于平仓中, give jumper")
+		self.ProcessLock.Unlock()
+		return
+	}
+	self.isClosingPos = true
+	self.ProcessLock.Unlock()
 
 	closingPos := &ActionOrder{
 		Action: ACTION_CLOSING,
@@ -561,4 +568,13 @@ func (self *Trader) closingPos(closePosName string) {
 
 	self.chanOrders <- closingPos
 	self.Output.Warn("closing pos, 开始平仓", closePosName, closingPos.Side, closingPos.Price, math.Abs(avgEntryQty))
+
+	// 30s 结束平仓状态
+	go func() {
+		time.AfterFunc(time.Second*30, func() {
+			self.ProcessLock.Lock()
+			self.isClosingPos = false
+			self.ProcessLock.Unlock()
+		})
+	}()
 }
