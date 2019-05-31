@@ -358,7 +358,7 @@ func (self *Trader) readyPlaceOrders() {
 
 // 获取当前持仓情况
 func (self *Trader) getPosition() {
-	chanTick := time.Tick(time.Second * 20)
+	chanTick := time.Tick(time.Second * 15)
 	for {
 		select {
 		case <-self.Ctx.Done():
@@ -418,7 +418,7 @@ func (self *Trader) ClosingPos() {
 	// 超过30个点, 平仓
 	go func() {
 		self.Output.Log("closing pos 3 running ...")
-		chanTick := time.Tick(time.Minute * 2)
+		chanTick := time.Tick(time.Minute)
 		for {
 			<-chanTick
 			select {
