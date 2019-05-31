@@ -36,7 +36,7 @@ func main() {
 	}
 	defer mc.Output.Close()
 
-	fs, err := os.Open("./realnet/keys.txt")
+	fs, err := os.Open("./keys.txt")
 	if err != nil {
 		mc.Output.Fatal("open keys-file failed", err)
 	}

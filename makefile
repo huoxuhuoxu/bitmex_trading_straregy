@@ -4,8 +4,6 @@
 #
 #################
 
-bm:
-	go run ./testnet
 
 
 install:
