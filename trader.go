@@ -95,7 +95,7 @@ func (self *Trader) Running() {
 	go self.handerList()
 	go self.getPosition()
 	go self.readyPlaceOrders()
-	go self.ClosingPos()
+	go self.intervalClosingPos()
 }
 
 // ws异常处理
@@ -170,7 +170,7 @@ func (self *Trader) wsReceiveMessage() {
 				self.Depth.Buy = depthPair.Buy
 				self.Depth.Sell = depthPair.Sell
 				self.Depth.UpdatedAt = time.Now()
-				self.Output.Logf("real depth %+v", self.Depth)
+				self.Output.Logf("real depth %.1f %.1f", self.Depth.Buy, self.Depth.Sell)
 			}
 		}
 	}, func(err error) {
@@ -379,7 +379,7 @@ func (self *Trader) getPosition() {
 }
 
 // 平仓
-func (self *Trader) IntervalClosingPos() {
+func (self *Trader) intervalClosingPos() {
 	// 长时间定时平仓: 防止爆仓
 	go func() {
 		self.Output.Log("closing pos 1 running ...")
@@ -437,7 +437,7 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 
 	// 波动率
 	if pastVol, ok := self.IsHighVolatility(reasonablePrice); ok {
-		errMsg := fmt.Sprintf("volatility is high: .1f", pastVol-reasonablePrice)
+		errMsg := fmt.Sprintf("volatility is high: %.1f", pastVol-reasonablePrice)
 		return nil, nil, errors.New(errMsg)
 	} else {
 		self.Output.Logf("volatility: %.1f", pastVol-reasonablePrice)
