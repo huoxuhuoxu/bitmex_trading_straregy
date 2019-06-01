@@ -159,7 +159,7 @@ func (self *Trader) wsReceiveMessage() {
 				var t time.Time
 				if self.Depth.UpdatedAt != t {
 					t = time.Now()
-					if t.Sub(self.Depth.UpdatedAt) > time.Minute*5 {
+					if t.Sub(self.Depth.UpdatedAt) > time.Minute*4 {
 						self.Output.Warn("depth error, 长时间没有变动过了!")
 						self.Sr.RestartProcess()
 					}
