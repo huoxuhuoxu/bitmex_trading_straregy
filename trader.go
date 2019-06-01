@@ -96,6 +96,7 @@ func (self *Trader) Running() {
 	go self.readyPlaceOrders()
 	go self.intervalClosingPos()
 	go self.priceIsError()
+	go self.getWallet()
 }
 
 // ws 出现介价格错误时的丢弃 后续处理
@@ -410,6 +411,24 @@ func (self *Trader) getPosition() {
 				Action: ACTION_POS,
 			}
 			self.chanOrders <- posAction
+		}
+		<-chanTick
+	}
+}
+
+// 获取账户信息
+func (self *Trader) getWallet() {
+	chanTick := time.Tick(time.Minute * 5)
+	for {
+		select {
+		case <-self.Ctx.Done():
+			self.Output.Log("chan get wallet, closed")
+			return
+		default:
+			wallet := &ActionOrder{
+				Action: ACTION_WALLET,
+			}
+			self.chanOrders <- wallet
 		}
 		<-chanTick
 	}
