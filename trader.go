@@ -510,13 +510,13 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 		// 多头头寸
 		if self.AvgEntryQty > 0 {
 			if self.AvgEntryPrice <= bidPrice {
-				askPrice = self.AvgEntryPrice + self.MinDiffPrice
+				askPrice = math.Floor(self.AvgEntryPrice + self.MinDiffPrice)
 			}
 		}
 		// 空头头寸
 		if self.AvgEntryQty < 0 {
 			if self.AvgEntryPrice >= askPrice {
-				bidPrice = self.AvgEntryPrice - self.MinDiffPrice
+				bidPrice = math.Ceil(self.AvgEntryPrice - self.MinDiffPrice)
 			}
 		}
 
