@@ -101,6 +101,7 @@ func (self *Trader) Running() {
 // ws 出现介价格错误时的丢弃 后续处理
 func (self *Trader) priceIsError() {
 	go func() {
+		self.Output.Log("price is error running ...")
 		chanTick := time.Tick(time.Minute)
 		for {
 			<-chanTick
