@@ -46,7 +46,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		MinDiffPrice:    10,
 		MaxDiffPrice:    30,
 		TimeStep:        time.Second * 60,
-		CancelOrderStep: time.Second * 300,
+		CancelOrderStep: time.Second * 420, // 7分钟
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
