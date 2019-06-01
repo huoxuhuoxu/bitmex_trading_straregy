@@ -95,6 +95,31 @@ func (self *Trader) Running() {
 	go self.getPosition()
 	go self.readyPlaceOrders()
 	go self.intervalClosingPos()
+	go self.priceIsError()
+}
+
+// ws 出现介价格错误时的丢弃 后续处理
+func (self *Trader) priceIsError() {
+	go func() {
+		chanTick := time.Tick(time.Minute)
+		for {
+			<-chanTick
+			select {
+			case <-self.Ctx.Done():
+				self.Output.Log("price is error, closed")
+				return
+			default:
+				func() {
+					self.ProcessLock.RLock()
+					defer self.ProcessLock.RUnlock()
+					if time.Now().Sub(self.Depth.UpdatedAt) > time.Minute*5 {
+						self.Output.Warn("price is error, restart program!")
+						self.Sr.RestartProcess()
+					}
+				}()
+			}
+		}
+	}()
 }
 
 // ws异常处理
