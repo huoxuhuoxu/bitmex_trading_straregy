@@ -154,23 +154,24 @@ func (self *Trader) wsReceiveMessage() {
 				return
 			}
 
-			// depth
-			if depthPair.Buy != self.Depth.Buy || depthPair.Sell != self.Depth.Sell {
+			// 长时间价格没有变动, 视为交易所行情信息出错了, 重启
+			if depthPair.Buy == self.Depth.Buy && depthPair.Sell == self.Depth.Sell {
 				var t time.Time
 				if self.Depth.UpdatedAt != t {
 					t = time.Now()
 					if t.Sub(self.Depth.UpdatedAt) > time.Minute*3 {
 						self.Output.Warn("depth error, 长时间没有变动过了!")
 						self.Sr.RestartProcess()
-						return
 					}
 				}
-
-				self.Depth.Buy = depthPair.Buy
-				self.Depth.Sell = depthPair.Sell
-				self.Depth.UpdatedAt = time.Now()
-				self.Output.Logf("real depth %.1f %.1f", self.Depth.Buy, self.Depth.Sell)
+				return
 			}
+
+			// depth
+			self.Depth.Buy = depthPair.Buy
+			self.Depth.Sell = depthPair.Sell
+			self.Depth.UpdatedAt = time.Now()
+			self.Output.Logf("real depth %.1f %.1f", self.Depth.Buy, self.Depth.Sell)
 		}
 	}, func(err error) {
 		self.wsExceptHandler(wsConn, err)
