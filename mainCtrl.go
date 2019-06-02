@@ -45,7 +45,7 @@ func NewMainCtrl(isDebug bool) (*MainControl, error) {
 		}
 
 		// process restart
-		mc.Sr = systemRp.NewSystemRp(time.Hour * 12)
+		mc.Sr = systemRp.NewSystemRp(time.Hour * 24)
 		mc.Sr.SubscribeBeforeFunc(mc.Output.Close)
 
 		// 主控制流

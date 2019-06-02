@@ -30,6 +30,7 @@ type Trader struct {
 	*PositionInfo                             // 账号运行时
 	chanOrders        chan *ActionOrder       // 订单处理管道
 	poOrders          map[string]*ActionOrder // 下成功的订单
+	unfinishOrders    []goex.Order            // 待成交的列队
 	isClosingPos      bool                    // 是否处于平仓中
 	*Volatility
 }
@@ -55,7 +56,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		PositionInfo:    &PositionInfo{},
 		chanOrders:      make(chan *ActionOrder, 1),
 		poOrders:        make(map[string]*ActionOrder, 0),
-		Volatility:      NewVolatility(18),
+		Volatility:      NewVolatility(20),
 	}
 
 	self.Exchange = conn.NewConn(
@@ -95,6 +96,7 @@ func (self *Trader) Running() {
 	go self.getPosition()
 	go self.readyPlaceOrders()
 	go self.intervalClosingPos()
+	go self.getUnfinishOrders()
 	go self.priceIsError()
 	go self.getWallet()
 }
@@ -304,6 +306,14 @@ func (self *Trader) handerList() {
 						break
 					}
 
+				case ACTION_UNFINISH:
+					orders, err := self.Exchange.UnfinishOrders()
+					if err != nil {
+						self.Output.Error("get unfinish orders failed", err)
+						continue
+					}
+					self.unfinishOrders = orders
+
 				case ACTION_WALLET:
 					wallet, err := self.Exchange.AccountInfo()
 					if err != nil {
@@ -434,6 +444,24 @@ func (self *Trader) getWallet() {
 	}
 }
 
+// 获取未完成订单列表
+func (self *Trader) getUnfinishOrders() {
+	chanTick := time.Tick(time.Second * 30)
+	for {
+		select {
+		case <-self.Ctx.Done():
+			self.Output.Log("chan unfinish orders, closed")
+			return
+		default:
+			unfinish := &ActionOrder{
+				Action: ACTION_UNFINISH,
+			}
+			self.chanOrders <- unfinish
+		}
+		<-chanTick
+	}
+}
+
 // 平仓
 func (self *Trader) intervalClosingPos() {
 	// 长时间定时平仓: 防止爆仓
@@ -461,7 +489,7 @@ func (self *Trader) intervalClosingPos() {
 	// 超过30个点, 平仓
 	go func() {
 		self.Output.Log("closing pos 3 running ...")
-		chanTick := time.Tick(time.Minute)
+		chanTick := time.Tick(time.Minute * 2)
 		for {
 			<-chanTick
 			select {
@@ -509,11 +537,11 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 	var bidAmount = self.BaseAmount
 	var askAmount = self.BaseAmount
 	var tmpAskAmount, tmpBidAmount, tmpDiffAmount float64
-	for _, order := range self.poOrders {
+	for _, order := range self.unfinishOrders {
 		switch order.Side {
-		case TraderSell:
+		case goex.SELL:
 			tmpAskAmount -= order.Amount
-		case TraderBuy:
+		case goex.BUY:
 			tmpBidAmount += order.Amount
 		}
 	}
@@ -526,6 +554,7 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 	}
 
 	tmpDiffAmount = tmpBidAmount + tmpAskAmount
+	self.Output.Warn("diff 持仓+待成交, 偏差", tmpDiffAmount)
 	if tmpDiffAmount > 0 {
 		askAmount += tmpDiffAmount
 	}
@@ -535,10 +564,10 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 
 	// 补丁!!!, 在没撤单前, 成交会算进偏差内, 需要处理变更
 	if bidAmount >= 150 {
-		bidAmount = self.BaseAmount
+		bidAmount = 150
 	}
 	if askAmount >= 150 {
-		askAmount = self.BaseAmount
+		askAmount = 150
 	}
 
 	/*
