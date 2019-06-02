@@ -46,8 +46,8 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		MaxPos:          4000,
 		MinDiffPrice:    10,
 		MaxDiffPrice:    30,
-		TimeStep:        time.Second * 60,
-		CancelOrderStep: time.Second * 420, // 7分钟
+		TimeStep:        time.Second * 45,
+		CancelOrderStep: time.Second * 360, // 8分钟
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
@@ -563,11 +563,11 @@ func (self *Trader) calculateReasonablePrice() (*PlaceOrderParams, *PlaceOrderPa
 	}
 
 	// 补丁!!!, 在没撤单前, 成交会算进偏差内, 需要处理变更
-	if bidAmount >= 150 {
-		bidAmount = 150
+	if bidAmount >= 100 {
+		bidAmount = 100
 	}
-	if askAmount >= 150 {
-		askAmount = 150
+	if askAmount >= 100 {
+		askAmount = 100
 	}
 
 	/*
