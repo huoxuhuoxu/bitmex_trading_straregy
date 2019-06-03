@@ -42,12 +42,12 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		SecretKey:       secretKey,
 		Depth:           &Depth{},
 		ProcessLock:     &sync.RWMutex{},
-		AlertPos:        1500,
+		AlertPos:        1000,
 		MaxPos:          4000,
-		MinDiffPrice:    10,
-		MaxDiffPrice:    30,
+		MinDiffPrice:    5,
+		MaxDiffPrice:    20,
 		TimeStep:        time.Second * 45,
-		CancelOrderStep: time.Second * 360, // 8分钟
+		CancelOrderStep: time.Second * 225, // 8分钟
 		Exchange:        nil,
 		Contract:        nil,
 		Currency:        [2]string{"XBT", "USD"},
