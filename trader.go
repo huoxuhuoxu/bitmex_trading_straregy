@@ -302,7 +302,7 @@ func (self *Trader) closingPos() {
 		self.isClosingPos = true
 		// 200个点, 直接平掉
 		middlePrice := math.Ceil((self.Depth.Buy + self.Depth.Sell) / 2)
-		if math.Abs(self.PositionInfo.AvgEntryPrice-middlePrice) > 200 {
+		if self.PositionInfo.AvgEntryPrice != 0 && math.Abs(self.PositionInfo.AvgEntryPrice-middlePrice) > 200 {
 			if self.PositionInfo.AvgEntryQty > 0 {
 				// 持有多头头寸
 				order, err := self.Exchange.PlaceAnOrder("SELL", self.PositionInfo.AvgEntryQty, middlePrice-self.BasePrice)
