@@ -44,6 +44,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		BasePrice:    20,
 		isRunning:    true,
 		PositionInfo: &PositionInfo{},
+		isClosingPos: false,
 		isDebug:      isDebug,
 	}
 
@@ -81,9 +82,9 @@ func (self *Trader) Running() {
 	// running
 	self.wsReceiveMessage()
 	go self.priceIsError()
-	self.po()
-	self.getPos()
-	self.closingPos()
+	go self.po()
+	go self.getPos()
+	go self.closingPos()
 }
 
 // ws 出现介价格错误时的丢弃 后续处理
@@ -194,71 +195,69 @@ func (self *Trader) wsReceiveMessage() {
 
 // 下单
 func (self *Trader) po() {
-	go func() {
-		// 等待 depth 完成初始化
-		self.Output.Log("waiting 30s, po init ...")
-		time.Sleep(time.Second * 30)
+	// 等待 depth 完成初始化
+	self.Output.Log("waiting 30s, po init ...")
+	time.Sleep(time.Second * 30)
 
-		// 定时下单/撤单
-		var chanTick <-chan time.Time
-		if self.isDebug {
-			chanTick = time.Tick(time.Minute * 5)
-		} else {
-			chanTick = time.Tick(time.Hour)
+	// 定时下单/撤单
+	var chanTick <-chan time.Time
+	if self.isDebug {
+		chanTick = time.Tick(time.Minute * 5)
+	} else {
+		chanTick = time.Tick(time.Hour)
+	}
+
+	for {
+		// 优先撤单
+		self.co()
+
+		// 执行下单
+		self.ProcessLock.RLock()
+		bid1 := self.Depth.Buy
+		ask1 := self.Depth.Sell
+		isRunning := self.isRunning
+		self.ProcessLock.RUnlock()
+
+		if !isRunning {
+			self.Output.Warn("err: 处于不可运行状态, 等待一分钟后重新尝试 ...")
+			time.Sleep(time.Minute)
+			continue
 		}
 
-		for {
-			// 优先撤单
-			self.co()
-
-			// 执行下单
-			self.ProcessLock.RLock()
-			bid1 := self.Depth.Buy
-			ask1 := self.Depth.Sell
-			isRunning := self.isRunning
-			self.ProcessLock.RUnlock()
-
-			if !isRunning {
-				self.Output.Warn("err: 处于不可运行状态, 等待一分钟后重新尝试 ...")
-				time.Sleep(time.Minute)
-				continue
-			}
-
-			var bidList, askList [10]float64
-			for i := 0; i < 10; i++ {
-				diff := self.BasePrice * float64(i+1)
-				bidList[i] = bid1 - diff
-				askList[i] = ask1 + diff
-			}
-
-			for _, bidPrice := range bidList {
-				for {
-					order, err := self.Exchange.PlaceAnOrder("BUY", self.BaseAmount, bidPrice)
-					if err != nil {
-						self.Output.Errorf("po buy err: %+v", err)
-						time.Sleep(time.Second)
-						continue
-					}
-					self.Output.Infof("po buy %+v", order)
-					break
-				}
-			}
-			for _, askPrice := range askList {
-				for {
-					order, err := self.Exchange.PlaceAnOrder("SELL", self.BaseAmount, askPrice)
-					if err != nil {
-						self.Output.Errorf("po buy err: %+v", err)
-						time.Sleep(time.Second)
-						continue
-					}
-					self.Output.Infof("po sell %+v", order)
-					break
-				}
-			}
-
-			<-chanTick
+		var bidList, askList [10]float64
+		for i := 0; i < 10; i++ {
+			diff := self.BasePrice * float64(i+1)
+			bidList[i] = bid1 - diff
+			askList[i] = ask1 + diff
 		}
-	}()
+
+		for _, bidPrice := range bidList {
+			for {
+				order, err := self.Exchange.PlaceAnOrder("BUY", self.BaseAmount, bidPrice)
+				if err != nil {
+					self.Output.Errorf("po buy err: %+v", err)
+					time.Sleep(time.Second)
+					continue
+				}
+				self.Output.Infof("po buy %+v", order)
+				break
+			}
+		}
+		for _, askPrice := range askList {
+			for {
+				order, err := self.Exchange.PlaceAnOrder("SELL", self.BaseAmount, askPrice)
+				if err != nil {
+					self.Output.Errorf("po buy err: %+v", err)
+					time.Sleep(time.Second)
+					continue
+				}
+				self.Output.Infof("po sell %+v", order)
+				break
+			}
+		}
+
+		<-chanTick
+	}
 }
 
 // 撤单
@@ -314,7 +313,6 @@ func (self *Trader) closingPos() {
 				self.Output.Infof("closing buy pos: %+v %+v", order, err)
 			}
 		}
-		self.ProcessLock.Unlock()
 
 		// 三分钟后解锁
 		time.AfterFunc(time.Minute*3, func() {
@@ -323,6 +321,8 @@ func (self *Trader) closingPos() {
 			self.Output.Warn("warn, lock is NO ...")
 			self.ProcessLock.Unlock()
 		})
+
+		self.ProcessLock.Unlock()
 	}
 }
 
