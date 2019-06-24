@@ -51,6 +51,8 @@ func main() {
 	API_KEY = rets[0]
 	SECRET_KEY = rets[1]
 
+	log.Println(API_KEY, SECRET_KEY)
+
 	trader := NewTrader(API_KEY, SECRET_KEY, mc, *isDebug)
 	trader.Running()
 
