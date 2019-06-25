@@ -41,7 +41,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		Contract:     nil,
 		Currency:     [2]string{"XBT", "USD"},
 		BaseAmount:   100,
-		BasePrice:    25,
+		BasePrice:    20,
 		isRunning:    true,
 		PositionInfo: &PositionInfo{},
 		isClosingPos: false,
