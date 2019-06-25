@@ -41,7 +41,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		Contract:     nil,
 		Currency:     [2]string{"XBT", "USD"},
 		BaseAmount:   50,
-		BasePrice:    20,
+		BasePrice:    30,
 		isRunning:    true,
 		PositionInfo: &PositionInfo{},
 		isClosingPos: false,
@@ -302,7 +302,7 @@ func (self *Trader) closingPos() {
 		self.isClosingPos = true
 		// 200个点, 直接平掉
 		middlePrice := math.Ceil((self.Depth.Buy + self.Depth.Sell) / 2)
-		if self.PositionInfo.AvgEntryPrice != 0 && math.Abs(self.PositionInfo.AvgEntryPrice-middlePrice) > 200 {
+		if self.PositionInfo.AvgEntryPrice != 0 && math.Abs(self.PositionInfo.AvgEntryPrice-middlePrice) > 300 {
 			if self.PositionInfo.AvgEntryQty > 0 {
 				// 持有多头头寸
 				order, err := self.Exchange.PlaceAnOrder("SELL", self.PositionInfo.AvgEntryQty, middlePrice-self.BasePrice)
