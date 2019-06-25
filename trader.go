@@ -313,7 +313,7 @@ func (self *Trader) closingPos() {
 				self.Output.Infof("closing buy pos: %+v %+v", order, err)
 			}
 		}
-
+		// 单子下下去了, 理论上会立刻成交, 但是如果发生意外, 两分钟已经检查, 发起撤单了, 防止单边平仓单挂多了
 		// 三分钟后解锁
 		time.AfterFunc(time.Minute*3, func() {
 			self.ProcessLock.Lock()
