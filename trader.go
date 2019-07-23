@@ -40,8 +40,8 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		Exchange:     nil,
 		Contract:     nil,
 		Currency:     [2]string{"XBT", "USD"},
-		BaseAmount:   50,
-		BasePrice:    30,
+		BaseAmount:   40,
+		BasePrice:    10,
 		isRunning:    true,
 		PositionInfo: &PositionInfo{},
 		isClosingPos: false,
@@ -204,7 +204,7 @@ func (self *Trader) po() {
 	if self.isDebug {
 		chanTick = time.Tick(time.Minute * 5)
 	} else {
-		chanTick = time.Tick(time.Hour)
+		chanTick = time.Tick(time.Minute * 10)
 	}
 
 	for {
