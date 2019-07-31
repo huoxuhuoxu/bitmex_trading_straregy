@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -13,6 +14,23 @@ func main() {
 		"curA": "BTC",
 		"curB": "USDT",
 	})
+
+	log.Println("----------------------- In Day \r\n")
+
+	get2h(exchangeAPI)
+	time.Sleep(3 * time.Second)
+
+	get4h(exchangeAPI)
+	time.Sleep(3 * time.Second)
+
+	get6h(exchangeAPI)
+	time.Sleep(3 * time.Second)
+
+	get12h(exchangeAPI)
+	time.Sleep(3 * time.Second)
+
+	fmt.Println("\r\n")
+	log.Println("----------------------- Day Level\r\n")
 
 	get1day(exchangeAPI)
 	time.Sleep(3 * time.Second)
@@ -35,6 +53,50 @@ func main() {
 	get90day(exchangeAPI)
 	time.Sleep(3 * time.Second)
 
+}
+
+func get2h(exchangeAPI *conn.Conn) {
+	// 5m
+	num := 12 * 2 * 1
+	klines, err := exchangeAPI.Kline(3, num, (time.Now().Unix()-2*60*60)*1000)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cul("2h", klines, num)
+}
+
+func get4h(exchangeAPI *conn.Conn) {
+	// 5m
+	num := 12 * 4 * 1
+	klines, err := exchangeAPI.Kline(3, num, (time.Now().Unix()-4*60*60)*1000)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cul("4h", klines, num)
+}
+
+func get6h(exchangeAPI *conn.Conn) {
+	// 5m
+	num := 12 * 6 * 1
+	klines, err := exchangeAPI.Kline(3, num, (time.Now().Unix()-6*60*60)*1000)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cul("6h", klines, num)
+}
+
+func get12h(exchangeAPI *conn.Conn) {
+	// 5m
+	num := 12 * 12 * 1
+	klines, err := exchangeAPI.Kline(3, num, (time.Now().Unix()-12*60*60)*1000)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cul("12h", klines, num)
 }
 
 func get1day(exchangeAPI *conn.Conn) {
