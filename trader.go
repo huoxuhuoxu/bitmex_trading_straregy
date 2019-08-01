@@ -40,7 +40,7 @@ func NewTrader(apiKey, secretKey string, mc *MainControl, isDebug bool) *Trader 
 		Exchange:     nil,
 		Contract:     nil,
 		Currency:     [2]string{"XBT", "USD"},
-		BaseAmount:   40,
+		BaseAmount:   100,
 		BasePrice:    10,
 		isRunning:    true,
 		PositionInfo: &PositionInfo{},
@@ -201,11 +201,7 @@ func (self *Trader) po() {
 
 	// 定时下单/撤单
 	var chanTick <-chan time.Time
-	if self.isDebug {
-		chanTick = time.Tick(time.Minute * 5)
-	} else {
-		chanTick = time.Tick(time.Minute * 10)
-	}
+	chanTick = time.Tick(time.Minute * 5)
 
 	for {
 		// 优先撤单
