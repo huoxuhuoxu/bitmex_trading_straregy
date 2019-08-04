@@ -146,7 +146,7 @@ func (self *TransSystem) windControl(at AnalysisTrend) {
 				o, e := self.bitmexApi2.PlaceAnOrder("SELL", qty, bid1)
 				self.Output.Logf("po %+v, %+v", o, e)
 			} else {
-				if diff <= -50 && at == FALL {
+				if diff <= -100 && at == FALL {
 					o, e := self.bitmexApi2.PlaceAnOrder("SELL", qty, bid1)
 					self.Output.Warnf("closing po %+v, %+v", o, e)
 				}
@@ -158,7 +158,7 @@ func (self *TransSystem) windControl(at AnalysisTrend) {
 				o, e := self.bitmexApi2.PlaceAnOrder("BUY", qty, ask1)
 				self.Output.Logf("po %+v, %+v", o, e)
 			} else {
-				if diff <= -50 && at == RISE {
+				if diff <= -100 && at == RISE {
 					o, e := self.bitmexApi2.PlaceAnOrder("BUY", qty, ask1)
 					self.Output.Warnf("closing po %+v, %+v", o, e)
 				}
@@ -185,7 +185,6 @@ func (self *TransSystem) windControl(at AnalysisTrend) {
 			continue
 		}
 
-		self.Output.Log("co length", len(orders))
 		for _, order := range orders {
 			for i := 0; i < 10; i++ {
 				_, err := self.bitmexApi2.CancelOrder(order.OrderID2)
