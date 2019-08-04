@@ -2,3 +2,4 @@
 logs/*.log
 test/*
 keys*.*
+.env

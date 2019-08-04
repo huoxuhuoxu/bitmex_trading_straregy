@@ -8,8 +8,9 @@
 
 
 install:
-	go get gopkg.in/yaml.v2
-	go get github.com/google/uuid
-	go get github.com/nubo/jwt
-	go get github.com/huoxuhuoxu/GoEx
-	go get github.com/huoxuhuoxu/UseGoexPackaging
+	go get -u gopkg.in/yaml.v2
+	go get -u github.com/google/uuid
+	go get -u github.com/nubo/jwt
+	go get -u github.com/huoxuhuoxu/GoEx
+	go get -u github.com/huoxuhuoxu/UseGoexPackaging
+	go get -u github.com/joho/godotenv
