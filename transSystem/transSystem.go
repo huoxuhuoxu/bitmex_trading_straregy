@@ -89,46 +89,41 @@ func (self *TransSystem) Running() {
 	self.Output.Log("analysis succ")
 
 	self.wsReceiveMessage()
+}
 
-	go func() {
-		c := time.Tick(60 * time.Second)
-	loop:
-		for {
-			<-c
-			// self.Output.Log("loop, GetAnalysisRet")
-			tmpCurrentAnalysisTrend := self.analysis.GetAnalysisRet()
-			switch tmpCurrentAnalysisTrend {
-			case RISE:
-				self.Output.Info("上升")
-			case FALL:
-				self.Output.Info("下跌")
-			case CONCUSSION:
-				self.Output.Info("震荡")
-				fallthrough
-			case UNKNOW:
-				fallthrough
-			default:
-				self.Output.Info("analysis trend", tmpCurrentAnalysisTrend)
-				continue loop
-			}
+func (self *TransSystem) ready() {
+	// self.Output.Log("loop, GetAnalysisRet")
+	tmpCurrentAnalysisTrend := self.analysis.GetAnalysisRet()
+	switch tmpCurrentAnalysisTrend {
+	case RISE:
+		self.Output.Info("上升")
+	case FALL:
+		self.Output.Info("下跌")
+	case CONCUSSION:
+		self.Output.Info("震荡")
+		fallthrough
+	case UNKNOW:
+		fallthrough
+	default:
+		self.Output.Info("analysis trend", tmpCurrentAnalysisTrend)
+		return
+	}
 
-			self.processLock.Lock()
-			if self.depth[0] != 0 && self.depth[1] != 0 {
-				if time.Now().Sub(self.updatedAt) > 2*time.Minute {
-					self.Output.Error("ws except, depth updated then 2 minutes")
-					self.Sr.RestartProcess()
-					return
-				}
-			}
-			if self.depth[0] == 0 && self.depth[1] == 0 {
-				self.processLock.Unlock()
-				continue loop
-			}
-			self.processLock.Unlock()
-
-			go self.windControl(tmpCurrentAnalysisTrend)
+	self.processLock.Lock()
+	if self.depth[0] != 0 && self.depth[1] != 0 {
+		if time.Now().Sub(self.updatedAt) > 2*time.Minute {
+			self.Output.Error("ws except, depth updated then 2 minutes")
+			self.Sr.RestartProcess()
+			return
 		}
-	}()
+	}
+	if self.depth[0] == 0 && self.depth[1] == 0 {
+		self.processLock.Unlock()
+		return
+	}
+	self.processLock.Unlock()
+
+	go self.windControl(tmpCurrentAnalysisTrend)
 }
 
 func (self *TransSystem) windControl(at AnalysisTrend) {
@@ -220,9 +215,14 @@ func (self *TransSystem) wsReceiveMessage() {
 			depthPair := data.(goex.DepthPair)
 			self.processLock.Lock()
 			defer self.processLock.Unlock()
+			if time.Now().Sub(self.updatedAt) < 3*time.Second {
+				return
+			}
 
 			self.depth = [2]float64{depthPair.Buy, depthPair.Sell}
 			self.updatedAt = time.Now()
+
+			go self.ready()
 		}
 	}, func(err error) {
 		self.Output.Error("bitmex-ws except", err)
