@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -94,7 +95,7 @@ func (self *TransSystem) Running() {
 	loop:
 		for {
 			<-c
-			self.Output.Log("loop, GetAnalysisRet")
+			// self.Output.Log("loop, GetAnalysisRet")
 			tmpCurrentAnalysisTrend := self.analysis.GetAnalysisRet()
 			switch tmpCurrentAnalysisTrend {
 			case RISE:
@@ -143,14 +144,15 @@ func (self *TransSystem) windControl(at AnalysisTrend) {
 	self.processLock.Unlock()
 
 	if pi.AvgEntryQty != 0 {
+		qty := math.Abs(pi.AvgEntryQty)
 		if pi.AvgEntryQty > 0 {
 			diff := bid1 - pi.AvgEntryPrice
 			if diff >= 10 && at == FALL {
-				o, e := self.bitmexApi2.PlaceAnOrder("SELL", self.baseAmount, bid1)
+				o, e := self.bitmexApi2.PlaceAnOrder("SELL", qty, bid1)
 				self.Output.Logf("po %+v, %+v", o, e)
 			} else {
 				if diff <= -50 && at == FALL {
-					o, e := self.bitmexApi2.PlaceAnOrder("SELL", self.baseAmount, bid1)
+					o, e := self.bitmexApi2.PlaceAnOrder("SELL", qty, bid1)
 					self.Output.Warnf("closing po %+v, %+v", o, e)
 				}
 			}
@@ -158,11 +160,11 @@ func (self *TransSystem) windControl(at AnalysisTrend) {
 		} else {
 			diff := pi.AvgEntryPrice - ask1
 			if diff >= 10 && at == RISE {
-				o, e := self.bitmexApi2.PlaceAnOrder("BUY", self.baseAmount, ask1)
+				o, e := self.bitmexApi2.PlaceAnOrder("BUY", qty, ask1)
 				self.Output.Logf("po %+v, %+v", o, e)
 			} else {
 				if diff <= -50 && at == RISE {
-					o, e := self.bitmexApi2.PlaceAnOrder("BUY", self.baseAmount, ask1)
+					o, e := self.bitmexApi2.PlaceAnOrder("BUY", qty, ask1)
 					self.Output.Warnf("closing po %+v, %+v", o, e)
 				}
 			}

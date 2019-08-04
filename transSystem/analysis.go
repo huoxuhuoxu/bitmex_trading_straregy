@@ -118,7 +118,7 @@ func (self *Analysis) autoAnalysisCached() {
 		chanTick := time.Tick(10 * time.Second)
 		for {
 			<-chanTick
-			self.Output.Log("loop, autoAnalysisCached")
+			// self.Output.Log("loop, autoAnalysisCached")
 			self.chanDataT <- &AnalysisResult{}
 			ret := <-self.chanAnalysis
 			switch ret.(type) {
