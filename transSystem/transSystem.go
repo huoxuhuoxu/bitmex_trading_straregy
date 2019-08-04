@@ -145,11 +145,11 @@ func (self *TransSystem) windControl(at AnalysisTrend) {
 	if pi.AvgEntryQty != 0 {
 		if pi.AvgEntryQty > 0 {
 			diff := bid1 - pi.AvgEntryPrice
-			if diff >= 10 {
+			if diff >= 10 && at == FALL {
 				o, e := self.bitmexApi2.PlaceAnOrder("SELL", self.baseAmount, bid1)
 				self.Output.Logf("po %+v, %+v", o, e)
 			} else {
-				if diff <= -100 {
+				if diff <= -50 && at == FALL {
 					o, e := self.bitmexApi2.PlaceAnOrder("SELL", self.baseAmount, bid1)
 					self.Output.Warnf("closing po %+v, %+v", o, e)
 				}
@@ -157,11 +157,11 @@ func (self *TransSystem) windControl(at AnalysisTrend) {
 			self.Output.Log("diff", diff)
 		} else {
 			diff := pi.AvgEntryPrice - ask1
-			if diff >= 10 {
+			if diff >= 10 && at == RISE {
 				o, e := self.bitmexApi2.PlaceAnOrder("BUY", self.baseAmount, ask1)
 				self.Output.Logf("po %+v, %+v", o, e)
 			} else {
-				if diff <= -100 {
+				if diff <= -50 && at == RISE {
 					o, e := self.bitmexApi2.PlaceAnOrder("BUY", self.baseAmount, ask1)
 					self.Output.Warnf("closing po %+v, %+v", o, e)
 				}
