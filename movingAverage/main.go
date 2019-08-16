@@ -15,6 +15,20 @@ func main() {
 		"curB": "USDT",
 	})
 
+	log.Println("----------------------- In One hour \r\n")
+
+	get15m(exchangeAPI)
+	time.Sleep(3 * time.Second)
+
+	get30m(exchangeAPI)
+	time.Sleep(3 * time.Second)
+
+	get45m(exchangeAPI)
+	time.Sleep(3 * time.Second)
+
+	get1h(exchangeAPI)
+	time.Sleep(3 * time.Second)
+
 	log.Println("----------------------- In Day \r\n")
 
 	get2h(exchangeAPI)
@@ -53,6 +67,50 @@ func main() {
 	get90day(exchangeAPI)
 	time.Sleep(3 * time.Second)
 
+}
+
+func get15m(exchangeAPI *conn.Conn) {
+	// 1m
+	num := 15
+	klines, err := exchangeAPI.Kline(1, num, (time.Now().Unix()-1*15*60)*1000)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cul("15m", klines, num)
+}
+
+func get30m(exchangeAPI *conn.Conn) {
+	// 1m
+	num := 30
+	klines, err := exchangeAPI.Kline(1, num, (time.Now().Unix()-1*30*60)*1000)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cul("30m", klines, num)
+}
+
+func get45m(exchangeAPI *conn.Conn) {
+	// 1m
+	num := 45
+	klines, err := exchangeAPI.Kline(1, num, (time.Now().Unix()-1*45*60)*1000)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cul("45m", klines, num)
+}
+
+func get1h(exchangeAPI *conn.Conn) {
+	// 1m
+	num := 60
+	klines, err := exchangeAPI.Kline(1, num, (time.Now().Unix()-1*60*60)*1000)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cul("1h", klines, num)
 }
 
 func get2h(exchangeAPI *conn.Conn) {
