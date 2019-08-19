@@ -29,6 +29,7 @@ func main() {
 	get1h(exchangeAPI)
 	time.Sleep(3 * time.Second)
 
+	fmt.Println("\r\n")
 	log.Println("----------------------- In Day \r\n")
 
 	get2h(exchangeAPI)
